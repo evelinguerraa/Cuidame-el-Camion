@@ -208,6 +208,7 @@ button{font-family:inherit}
 .hoja h2{font-size:28px;font-weight:700;text-transform:uppercase;margin-bottom:4px}
 .hoja .desc{color:var(--muted);font-size:15.5px;margin-bottom:18px}
 .campo{margin-bottom:14px}
+.deDonde{text-transform:none;letter-spacing:0;font-weight:500;color:var(--accent)}
 .campo label{display:block;font-size:13px;font-weight:700;letter-spacing:.07em;
   text-transform:uppercase;color:var(--muted);margin-bottom:6px}
 .campo input,.campo select,.campo textarea{
@@ -733,7 +734,10 @@ function formViaje(v){
     '<div class="desc">'+(b.leido ? "Esto saqué de la carta de porte. Fijate que esté bien y guardá." : "Completá lo que sepas. Después lo podés corregir.")+'</div>'+
     (b.leido ? '<div class="ok">✓ Carta de porte leída'+(b.tieneCarta ? " y guardada" : "")+'</div>' : '')+
     (b.tarifaDeOtroViaje ? '<div class="aviso"><span>💲</span><div>La carta de porte vino <b>sin tarifa</b>. Puse la del último viaje parecido — revisala.</div></div>' : '')+
-    '<div class="campo"><label>Fecha</label><input type="date" id="fViaje" value="'+esc(b.fecha||hoyISO())+'"></div>'+
+    '<div class="campo"><label>Fecha'+
+      (b.fechaDeLaCarta ? ' <span class="deDonde">— la de la carta de porte</span>'
+       : b.leido ? ' <span class="deDonde">— la carta no la traía, puse la de hoy</span>' : '')+
+      '</label><input type="date" id="fViaje" value="'+esc(b.fecha||hoyISO())+'"></div>'+
     '<div class="campo"><label>De dónde salió</label><input id="fOrigen" value="'+esc(b.origen||"")+'" placeholder="Campo Los Trece"></div>'+
     '<div class="campo"><label>A dónde va</label><input id="fDestino" value="'+esc(b.destino||"")+'" placeholder="Puerto San Martín"></div>'+
     '<div class="par">'+
@@ -981,6 +985,7 @@ async function procesarArchivo(file){
 
     cerrar();
     var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, datos);
+    v.fechaDeLaCarta = !!datos.fecha;
     if(qr){ v.qr = qr.img; if(qr.aproximado) v.qrAprox = true; }
 
     /* si la carta de porte no trae tarifa, proponemos la del último viaje igual */
@@ -1171,7 +1176,9 @@ function leerCPE(lineas){
   var m;
   if((m = /CTG\s*:?\s*(\d{8,15})/i.exec(plano))) d.ctg = m[1];
   if((m = /N[°ºo]\s*CPE\s*:?\s*([\d]+-[\d]+)/i.exec(plano))) d.cpe = m[1];
+  /* fecha: primero la del encabezado; si no, la de Partida */
   if((m = /Fecha\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(plano))) d.fecha = m[3]+"-"+m[2]+"-"+m[1];
+  if(!d.fecha && (m = /Partida\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(plano))) d.fecha = m[3]+"-"+m[2]+"-"+m[1];
 
   /* kilos: el Peso Neto de la sección B (el de la G es el de descarga) */
   if((m = buscar(B.length ? B : lineas, /Peso\s*Neto\s*:?\s*([\d][\d.,]*)/i))) d.kilos = numeroDe(m[1]);
