@@ -984,6 +984,17 @@ async function procesarArchivo(file){
     }
 
     cerrar();
+
+    /* ¿esta carta de porte ya está cargada? (Android reenvía el archivo
+       cuando se vuelve a abrir la app, y no queremos viajes repetidos) */
+    if(datos.ctg){
+      var yaEsta = null;
+      for(var q=0;q<S.viajes.length;q++){
+        if(String(S.viajes[q].ctg||"") === String(datos.ctg)){ yaEsta = S.viajes[q]; break; }
+      }
+      if(yaEsta){ cartaRepetida(yaEsta, datos, file, blobPagina, qr); return; }
+    }
+
     var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, datos);
     v.fechaDeLaCarta = !!datos.fecha;
     if(qr){ v.qr = qr.img; if(qr.aproximado) v.qrAprox = true; }
@@ -1013,6 +1024,27 @@ async function procesarArchivo(file){
         '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cerrar</span></button>'+
       '</div>');
   }
+}
+
+/* la carta de porte ya estaba cargada: avisamos en vez de duplicar el viaje */
+var repetida = null;
+function cartaRepetida(viaje, datos, file, blobPagina, qr){
+  repetida = { datos: datos, file: file, pagina: blobPagina, qr: qr };
+  abrir(
+    '<h2>Esta ya la tenés</h2>'+
+    '<div class="desc">La carta de porte <b>CTG '+esc(viaje.ctg)+'</b> ya está cargada. No la guardo de nuevo para que no te queden dos viajes iguales.</div>'+
+    '<div class="fila" style="margin-bottom:16px">'+
+      '<div class="cab"><span class="fecha">'+esc(fechaLarga(viaje.fecha))+'</span>'+
+        (fleteDe(viaje) > 0 ? '<span class="monto num">'+plata(gananciaDe(viaje))+'</span>' : '<span class="falta">Falta la tarifa</span>')+'</div>'+
+      '<div class="ruta">'+esc(viaje.origen||"Sin origen")+'<span class="fl">→</span>'+esc(viaje.destino||"Sin destino")+'</div>'+
+      '<div class="det num">'+nf(viaje.kilos)+' kg'+(viaje.grano?' · '+esc(viaje.grano):'')+'</div>'+
+    '</div>'+
+    '<div class="acciones">'+
+      '<button class="btn pri" data-act="cerrar"><span class="ic">✓</span><span>Está bien, ya la tengo</span></button>'+
+      '<button class="btn chico" data-act="editarViaje" data-id="'+viaje.id+'"><span class="ic">✏️</span><span>Ver o corregir ese viaje</span></button>'+
+      '<button class="btn chico" data-act="cargarIgual"><span class="ic">＋</span><span>Cargarla igual como viaje nuevo</span></button>'+
+    '</div>'
+  );
 }
 
 async function pintarPagina(pag, anchoMax){
@@ -1069,24 +1101,28 @@ function ubicarQR(cv){
     };
   }
   var intentos = [
-    [0, 0, W, H, 1],                                          // la hoja entera
-    [W*0.45, 0, W*0.55, H*0.22, 2.2],                          // arriba a la derecha (donde está en ARCA)
-    [W*0.45, 0, W*0.55, H*0.22, 3.4],                          // lo mismo, más zoom
-    [0, 0, W, H*0.25, 1.8],                                    // toda la franja de arriba
-    [W*0.5, H*0.75, W*0.5, H*0.25, 2.2],                       // abajo a la derecha
-    [0, 0, W*0.55, H*0.22, 2.2],                               // arriba a la izquierda
-    [0, 0, W, H, 1.7]                                          // la hoja entera con zoom
+    [W*0.45, 0, W*0.55, H*0.22, 3],                            // arriba a la derecha (donde está en ARCA)
+    [W*0.45, 0, W*0.55, H*0.22, 1.6],                          // lo mismo, sin tanto zoom
+    [0, 0, W, H*0.25, 1.6],                                    // toda la franja de arriba
+    [0, 0, W*0.55, H*0.22, 3],                                 // arriba a la izquierda
+    [W*0.5, H*0.72, W*0.5, H*0.28, 2],                         // abajo a la derecha
+    [0, 0, W, H, 1]                                            // la hoja entera
   ];
+  var TOPE = 5000000; // los celulares no aguantan lienzos mucho más grandes
   for(var i=0;i<intentos.length;i++){
     var a = intentos[i];
-    var r = probar(Math.round(a[0]), Math.round(a[1]), Math.round(a[2]), Math.round(a[3]), a[4]);
+    var w = Math.round(a[2]), h = Math.round(a[3]), z = a[4];
+    if(w * h * z * z > TOPE) z = Math.max(0.5, Math.sqrt(TOPE / (w * h)));
+    var r = null;
+    try{ r = probar(Math.round(a[0]), Math.round(a[1]), w, h, z); }catch(e){}
     if(r) return r;
   }
   return null;
 }
 function recortarQR(cv, esCartaDePorte){
   try{
-    var caja = ubicarQR(cv), aproximado = false;
+    var caja = null, aproximado = false;
+    try{ caja = ubicarQR(cv); }catch(e){ caja = null; }
     if(!caja && esCartaDePorte){
       /* No se pudo descifrar, pero en la carta de porte de ARCA el QR
          siempre está arriba a la derecha: recortamos esa zona igual,
@@ -1554,6 +1590,22 @@ var ACC = {
     borrarCarta(i); quitar(S.viajes, i); guardar(); pintar();
   },
   verCarta: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) verCarta(v); },
+  cargarIgual: function(){
+    if(!repetida) return cerrar();
+    var r = repetida; repetida = null;
+    cerrar();
+    var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, r.datos);
+    v.fechaDeLaCarta = !!r.datos.fecha;
+    if(r.qr){ v.qr = r.qr.img; if(r.qr.aproximado) v.qrAprox = true; }
+    if(!v.tarifa){
+      var ref = tarifaSugerida(v.destino);
+      if(ref){ v.tarifa = ref.tarifa; v.tarifaModo = ref.tarifaModo || S.cfg.tarifaModo; v.tarifaDeOtroViaje = true; }
+    }
+    v.tieneCarta = true;
+    cartaPendiente = { id: v.id, archivo: r.file, pagina: r.pagina,
+                       nombre: (r.file && r.file.name) || "carta-de-porte.pdf", tipo: (r.file && r.file.type) || "" };
+    formViaje(v);
+  },
   borrarCarga: function(el){ if(confirm("¿Borrar esta carga de gasoil?")){ quitar(S.cargas, el.getAttribute("data-id")); guardar(); pintar(); } },
   borrarAdelanto: function(el){ if(confirm("¿Borrar este adelanto?")){ quitar(S.adelantos, el.getAttribute("data-id")); guardar(); pintar(); } },
   borrarEjemplos: function(){
@@ -1613,15 +1665,17 @@ function verCompartido(){
     return cache.match(CLAVE_COMPARTIDO).then(function(r){
       if(!r) return;
       return r.blob().then(function(blob){
-        cache.delete(CLAVE_COMPARTIDO);
-        var nombre = "carta-de-porte";
-        try{ nombre = decodeURIComponent(r.headers.get("x-nombre") || nombre); }catch(e){}
-        var tipo = r.headers.get("content-type") || blob.type || "";
-        var archivo;
-        try{ archivo = new File([blob], nombre, { type: tipo }); }
-        catch(e){ archivo = blob; archivo.name = nombre; }
-        pantalla = "viajes"; pintar();
-        procesarArchivo(archivo);
+        /* lo sacamos del guardado ANTES de procesarlo, así no se repite */
+        return cache.delete(CLAVE_COMPARTIDO).then(function(){
+          var nombre = "carta-de-porte";
+          try{ nombre = decodeURIComponent(r.headers.get("x-nombre") || nombre); }catch(e){}
+          var tipo = r.headers.get("content-type") || blob.type || "";
+          var archivo;
+          try{ archivo = new File([blob], nombre, { type: tipo }); }
+          catch(e){ archivo = blob; archivo.name = nombre; }
+          pantalla = "viajes"; pintar();
+          procesarArchivo(archivo);
+        });
       });
     });
   }).catch(function(){});
