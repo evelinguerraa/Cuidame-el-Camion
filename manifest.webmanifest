@@ -1,0 +1,16 @@
+{
+  "name": "Cuídame el Camión",
+  "short_name": "El Camión",
+  "description": "Viajes, cartas de porte, gasoil y adelantos.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#0E1310",
+  "theme_color": "#0E1310",
+  "lang": "es-AR",
+  "icons": [
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

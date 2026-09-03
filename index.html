@@ -1,3 +1,20 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="description" content="Viajes, cartas de porte, gasoil y adelantos del camion.">
+<meta name="theme-color" content="#0E1310" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#E9ECE5" media="(prefers-color-scheme: light)">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Cuidame el Camion">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icono.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="icono.svg">
+<style>html{-webkit-tap-highlight-color:transparent}img{max-width:100%}[hidden]{display:none!important}</style>
+</head>
+<body style="margin:0">
 <title>Cuídame el Camión</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -53,8 +70,8 @@ h1,h2,h3{font-family:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;mar
 .pantalla > .plata .tile{display:flex;flex-direction:column;justify-content:center}
 .pantalla > .consumo{flex:1 1 auto;max-height:250px;display:flex;flex-direction:column;justify-content:center}
 .pantalla > .vacio{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
-.pantalla > .lista{flex:1 1 auto;align-content:stretch}
-.pantalla > .lista .fila{display:flex;flex-direction:column;justify-content:center}
+.pantalla > .acciones{flex:1 1 auto;max-height:400px}
+.pantalla > .lista{flex:0 0 auto}
 .pantalla > :last-child{margin-bottom:0}
 
 /* ---------- barra superior ---------- */
@@ -63,7 +80,7 @@ h1,h2,h3{font-family:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;mar
   padding:18px 0 14px;border-bottom:1px solid var(--line-soft);
   display:flex;align-items:center;gap:13px;
 }
-.top h1{font-size:32px;font-weight:700;line-height:1;text-transform:uppercase}
+.top h1{font-size:30px;font-weight:700;line-height:1;text-transform:uppercase}
 .top .sub{color:var(--muted);font-size:14.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
 .badge-truck{
   width:48px;height:48px;border-radius:11px;background:var(--deep);color:var(--deep-ink);
@@ -92,7 +109,8 @@ h1,h2,h3{font-family:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;mar
 .tile.saldo .val{color:var(--good)}
 .tile.saldo.negativo .val{color:var(--bad)}
 .duo{display:grid;grid-template-columns:1fr 1fr;gap:13px}
-.duo .tile .val{font-size:33px}
+.duo .tile .val{font-size:28px}
+.duo .tile{padding:16px 15px}
 
 .mini{display:grid;grid-template-columns:repeat(3,1fr);gap:13px;margin-bottom:20px}
 .mini div{background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:14px 15px}
@@ -1323,3 +1341,5 @@ prepararIA();
 
 })();
 </script>
+</body>
+</html>
