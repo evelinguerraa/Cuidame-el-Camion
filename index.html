@@ -145,6 +145,7 @@ button{font-family:inherit}
   background:var(--surface);border:1px solid var(--line);border-radius:15px;
   padding:16px 18px;box-shadow:var(--shadow);
 }
+.fila.resaltada{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft), var(--shadow)}
 .fila .cab{display:flex;justify-content:space-between;align-items:baseline;gap:12px}
 .fila .fecha{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
 .fila .monto{font-family:"Barlow Condensed",sans-serif;font-size:29px;font-weight:700;line-height:1}
@@ -510,7 +511,7 @@ var TABS = [
   { k:"mes",       ic:"📊", t:"Mes" },
   { k:"ajustes",   ic:"⚙️", t:"Ajustes" }
 ];
-var pantalla = "viajes";
+var pantalla = "viajes", resaltado = null;
 var mesVista = hoyISO().slice(0,7);
 
 function nombreMes(m){
@@ -573,7 +574,7 @@ function vistaMes(){
 
 function filaViaje(v){
   var flete = fleteDe(v);
-  return '<div class="fila">'+
+  return '<div class="fila'+(resaltado===v.id?" resaltada":"")+'" data-viaje="'+v.id+'">'+
     '<div class="cab"><span class="fecha">'+esc(fechaCorta(v.fecha))+(v.ej?' <span class="tag">ejemplo</span>':'')+'</span>'+
       (flete > 0
         ? '<span class="monto num">'+plata(gananciaDe(v))+'</span>'
@@ -992,7 +993,7 @@ async function procesarArchivo(file){
       for(var q=0;q<S.viajes.length;q++){
         if(String(S.viajes[q].ctg||"") === String(datos.ctg)){ yaEsta = S.viajes[q]; break; }
       }
-      if(yaEsta){ cartaRepetida(yaEsta, datos, file, blobPagina, qr); return; }
+      if(yaEsta){ cartaRepetida(yaEsta); return; }
     }
 
     var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, datos);
@@ -1026,25 +1027,19 @@ async function procesarArchivo(file){
   }
 }
 
-/* la carta de porte ya estaba cargada: avisamos en vez de duplicar el viaje */
-var repetida = null;
-function cartaRepetida(viaje, datos, file, blobPagina, qr){
-  repetida = { datos: datos, file: file, pagina: blobPagina, qr: qr };
-  abrir(
-    '<h2>Esta ya la tenés</h2>'+
-    '<div class="desc">La carta de porte <b>CTG '+esc(viaje.ctg)+'</b> ya está cargada. No la guardo de nuevo para que no te queden dos viajes iguales.</div>'+
-    '<div class="fila" style="margin-bottom:16px">'+
-      '<div class="cab"><span class="fecha">'+esc(fechaLarga(viaje.fecha))+'</span>'+
-        (fleteDe(viaje) > 0 ? '<span class="monto num">'+plata(gananciaDe(viaje))+'</span>' : '<span class="falta">Falta la tarifa</span>')+'</div>'+
-      '<div class="ruta">'+esc(viaje.origen||"Sin origen")+'<span class="fl">→</span>'+esc(viaje.destino||"Sin destino")+'</div>'+
-      '<div class="det num">'+nf(viaje.kilos)+' kg'+(viaje.grano?' · '+esc(viaje.grano):'')+'</div>'+
-    '</div>'+
-    '<div class="acciones">'+
-      '<button class="btn pri" data-act="cerrar"><span class="ic">✓</span><span>Está bien, ya la tengo</span></button>'+
-      '<button class="btn chico" data-act="editarViaje" data-id="'+viaje.id+'"><span class="ic">✏️</span><span>Ver o corregir ese viaje</span></button>'+
-      '<button class="btn chico" data-act="cargarIgual"><span class="ic">＋</span><span>Cargarla igual como viaje nuevo</span></button>'+
-    '</div>'
-  );
+/* La carta de porte ya estaba cargada. No le preguntamos nada: cerramos,
+   lo llevamos al viaje que ya tenía y se lo marcamos un segundo. */
+function cartaRepetida(viaje){
+  cerrar();
+  pantalla = "viajes";
+  resaltado = viaje.id;
+  pintar();
+  toast("Esa carta de porte ya estaba cargada");
+  setTimeout(function(){
+    var fila = document.querySelector('.fila[data-viaje="' + viaje.id + '"]');
+    if(fila) fila.scrollIntoView({ block:"center", behavior:"smooth" });
+  }, 60);
+  setTimeout(function(){ resaltado = null; if(pantalla === "viajes") pintar(); }, 4000);
 }
 
 async function pintarPagina(pag, anchoMax){
@@ -1672,22 +1667,7 @@ var ACC = {
     borrarCarta(i); quitar(S.viajes, i); guardar(); pintar();
   },
   verCarta: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) verCarta(v); },
-  cargarIgual: function(){
-    if(!repetida) return cerrar();
-    var r = repetida; repetida = null;
-    cerrar();
-    var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, r.datos);
-    v.fechaDeLaCarta = !!r.datos.fecha;
-    if(r.qr){ v.qr = r.qr.img; if(r.qr.aproximado) v.qrAprox = true; }
-    if(!v.tarifa){
-      var ref = tarifaSugerida(v.destino);
-      if(ref){ v.tarifa = ref.tarifa; v.tarifaModo = ref.tarifaModo || S.cfg.tarifaModo; v.tarifaDeOtroViaje = true; }
-    }
-    v.tieneCarta = true;
-    cartaPendiente = { id: v.id, archivo: r.file, pagina: r.pagina,
-                       nombre: (r.file && r.file.name) || "carta-de-porte.pdf", tipo: (r.file && r.file.type) || "" };
-    formViaje(v);
-  },
+
   borrarCarga: function(el){ if(confirm("¿Borrar esta carga de gasoil?")){ quitar(S.cargas, el.getAttribute("data-id")); guardar(); pintar(); } },
   borrarAdelanto: function(el){ if(confirm("¿Borrar este adelanto?")){ quitar(S.adelantos, el.getAttribute("data-id")); guardar(); pintar(); } },
   borrarEjemplos: function(){
