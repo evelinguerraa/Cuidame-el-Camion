@@ -21,7 +21,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <style>
 :root{
   --bg:#E9ECE5; --surface:#FFFFFF; --surface2:#F3F5EF; --raised:#FFFFFF;
@@ -1119,15 +1119,80 @@ function ubicarQR(cv){
   }
   return null;
 }
+/* Si no se pudo descifrar el QR, al menos lo ubicamos por su forma:
+   un QR es un bloque cuadrado y denso, muy distinto de los renglones
+   de texto que tiene alrededor. */
+function bloqueDenso(cv, rx0, ry0, rw, rh){
+  rx0 = Math.max(0, Math.round(rx0)); ry0 = Math.max(0, Math.round(ry0));
+  rw = Math.min(cv.width - rx0, Math.round(rw)); rh = Math.min(cv.height - ry0, Math.round(rh));
+  if(rw < 40 || rh < 40) return null;
+  var d = cv.getContext("2d", { willReadFrequently: true }).getImageData(rx0, ry0, rw, rh).data;
+  /* la celda tiene que ser más grande que un cuadrito del QR, para que
+     mezcle blanco y negro; si es más chica, cada celda da un color solo */
+  var celda = Math.max(6, Math.round(Math.min(rw, rh) / 30));
+  var cols = Math.floor(rw / celda), fils = Math.floor(rh / celda);
+  if(cols < 4 || fils < 4) return null;
+
+  var marca = new Uint8Array(cols * fils);
+  for(var f = 0; f < fils; f++){
+    for(var c = 0; c < cols; c++){
+      var osc = 0, tot = 0;
+      for(var y = f*celda; y < (f+1)*celda; y++){
+        for(var x = c*celda; x < (c+1)*celda; x++){
+          var i = (y*rw + x) * 4;
+          if(d[i]*0.3 + d[i+1]*0.59 + d[i+2]*0.11 < 135) osc++;
+          tot++;
+        }
+      }
+      var dens = tot ? osc/tot : 0;
+      marca[f*cols + c] = (dens > 0.15 && dens < 0.95) ? 1 : 0;
+    }
+  }
+
+  var visto = new Uint8Array(cols * fils), mejor = null;
+  var vecinos = [[1,0],[-1,0],[0,1],[0,-1]];
+  for(var k = 0; k < marca.length; k++){
+    if(!marca[k] || visto[k]) continue;
+    var pila = [k], c0 = k % cols, c1 = c0, f0 = (k / cols) | 0, f1 = f0, n = 0;
+    visto[k] = 1;
+    while(pila.length){
+      var p = pila.pop(), pc = p % cols, pf = (p / cols) | 0;
+      n++;
+      if(pc < c0) c0 = pc; if(pc > c1) c1 = pc;
+      if(pf < f0) f0 = pf; if(pf > f1) f1 = pf;
+      for(var v = 0; v < 4; v++){
+        var nc = pc + vecinos[v][0], nf = pf + vecinos[v][1];
+        if(nc < 0 || nf < 0 || nc >= cols || nf >= fils) continue;
+        var q = nf*cols + nc;
+        if(marca[q] && !visto[q]){ visto[q] = 1; pila.push(q); }
+      }
+    }
+    var an = c1 - c0 + 1, al = f1 - f0 + 1, prop = an / al;
+    var lleno = n / (an * al);
+    if(prop > 0.6 && prop < 1.6 && an >= 4 && al >= 4 && lleno > 0.6 && (!mejor || n > mejor.n)){
+      mejor = { c0:c0, c1:c1, f0:f0, f1:f1, n:n };
+    }
+  }
+  if(!mejor) return null;
+  return {
+    x0: rx0 + mejor.c0 * celda,       x1: rx0 + (mejor.c1 + 1) * celda,
+    y0: ry0 + mejor.f0 * celda,       y1: ry0 + (mejor.f1 + 1) * celda
+  };
+}
 function recortarQR(cv, esCartaDePorte){
   try{
     var caja = null, aproximado = false;
     try{ caja = ubicarQR(cv); }catch(e){ caja = null; }
     if(!caja && esCartaDePorte){
-      /* No se pudo descifrar, pero en la carta de porte de ARCA el QR
-         siempre está arriba a la derecha: recortamos esa zona igual,
-         que es lo mismo que hacer la captura a mano. */
-      caja = { x0: cv.width*0.625, x1: cv.width*0.87, y0: cv.height*0.012, y1: cv.height*0.115 };
+      /* buscamos el bloque cuadrado en la franja de arriba a la derecha */
+      try{ caja = bloqueDenso(cv, cv.width*0.55, 0, cv.width*0.45, cv.height*0.14); }catch(e){}
+      if(!caja){
+        try{ caja = bloqueDenso(cv, 0, 0, cv.width, cv.height*0.16); }catch(e){}
+      }
+      if(!caja){
+        /* último recurso: la zona donde ARCA lo pone siempre */
+        caja = { x0: cv.width*0.665, x1: cv.width*0.785, y0: cv.height*0.018, y1: cv.height*0.082 };
+      }
       aproximado = true;
     }
     if(!caja) return null;
@@ -1174,9 +1239,24 @@ function enFilas(tc){
 function limpiar(s){
   return (s||"").replace(/\s+/g," ").replace(/^[\s:.-]+|[\s:.-]+$/g,"").trim();
 }
-function numeroDe(s){
+/* Los números de la carta de porte de ARCA vienen con PUNTO decimal
+   ("Tarifa: 61580.9" son sesenta y un mil quinientos ochenta con 90).
+   Si le sacábamos el punto quedaba 615.809, diez veces más. */
+function numeroDe(s, puntoEsDecimal){
+  if(s === 0) return 0;
   if(!s) return 0;
-  var t = String(s).replace(/\./g,"").replace(",", ".").replace(/[^\d.]/g,"");
+  var t = String(s).trim().replace(/[^\d.,]/g, "");
+  if(!t) return 0;
+  var comas = (t.match(/,/g) || []).length;
+  var puntos = (t.match(/\./g) || []).length;
+  if(comas){
+    t = t.replace(/\./g, "").replace(",", ".");          // 61.580,90  → 61580.90
+  } else if(puntos > 1){
+    t = t.replace(/\./g, "");                            // 1.234.567  → 1234567
+  } else if(puntos === 1){
+    var dec = t.split(".")[1] || "";
+    if(dec.length === 3 && !puntoEsDecimal) t = t.replace(".", "");   // 45.000 → 45000
+  }
   var n = parseFloat(t);
   return isNaN(n) ? 0 : n;
 }
@@ -1217,10 +1297,12 @@ function leerCPE(lineas){
   if(!d.fecha && (m = /Partida\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(plano))) d.fecha = m[3]+"-"+m[2]+"-"+m[1];
 
   /* kilos: el Peso Neto de la sección B (el de la G es el de descarga) */
-  if((m = buscar(B.length ? B : lineas, /Peso\s*Neto\s*:?\s*([\d][\d.,]*)/i))) d.kilos = numeroDe(m[1]);
-  if((m = buscar(B.length ? B : lineas, /Peso\s*Bruto\s*:?\s*([\d][\d.,]*)/i))) d.bruto = numeroDe(m[1]);
-  if((m = buscar(B.length ? B : lineas, /Peso\s*Tara\s*:?\s*([\d][\d.,]*)/i))) d.tara = numeroDe(m[1]);
+  if((m = buscar(B.length ? B : lineas, /Peso\s*Neto\s*:?\s*([\d][\d.,]*)/i))) d.kilos = numeroDe(m[1], true);
+  if((m = buscar(B.length ? B : lineas, /Peso\s*Bruto\s*:?\s*([\d][\d.,]*)/i))) d.bruto = numeroDe(m[1], true);
+  if((m = buscar(B.length ? B : lineas, /Peso\s*Tara\s*:?\s*([\d][\d.,]*)/i))) d.tara = numeroDe(m[1], true);
   if(!d.kilos && d.bruto && d.tara) d.kilos = d.bruto - d.tara;
+  /* si el peso quedo absurdo (un punto mal interpretado), lo corregimos */
+  ["kilos","bruto","tara"].forEach(function(k){ if(d[k] > 0 && d[k] < 1000) d[k] = Math.round(d[k] * 1000); });
 
   /* grano: "Tipo:" es el más confiable; nunca la palabra ESPECIE del título */
   if((m = buscar(B, /Tipo\s*:\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,20})/i))) d.grano = limpiar(m[1]);
@@ -1252,8 +1334,8 @@ function leerCPE(lineas){
   }
 
   /* transporte: kilómetros y tarifa */
-  if((m = buscar(E.length ? E : lineas, /Kms?\.?\s*a\s*recorrer\s*:?\s*([\d][\d.,]*)/i))) d.kms = numeroDe(m[1]);
-  if((m = buscar(E.length ? E : lineas, /Tarifa\s*:?\s*([\d][\d.,]*)/i))) d.tarifa = numeroDe(m[1]);
+  if((m = buscar(E.length ? E : lineas, /Kms?\.?\s*a\s*recorrer\s*:?\s*([\d][\d.,]*)/i))) d.kms = numeroDe(m[1], true);
+  if((m = buscar(E.length ? E : lineas, /Tarifa\s*:?\s*([\d][\d.,]*)/i))) d.tarifa = numeroDe(m[1], true);
   if((m = buscar(E, /Dominios?\s*:?\s*([A-Z0-9]{6,8}(?:\s*[-–]\s*[A-Z0-9]{6,8})?)/i))) d.patente = limpiar(m[1]);
 
   return d;
