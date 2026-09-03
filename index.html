@@ -253,6 +253,10 @@ button{font-family:inherit}
 #mQR .btn{background:#F3F5EF;border-color:#D3DACD;color:#111111}
 #mQR .btn.pri{background:#C98A05;border-color:#C98A05;color:#231803}
 #mQR .brillo{text-align:center;font-size:13px;color:#5A665D;margin:0 0 14px}
+#mQR .hoja-carta{width:100%;max-width:none;border:1px solid #D3DACD;border-radius:8px;margin:12px 0 0}
+#mQR .aprox{text-align:center;font-size:13px;color:#8A5A00;background:#FCF0D6;border-radius:9px;padding:9px 12px;margin:0 0 12px}
+.falta{color:var(--accent);font-weight:600}
+.calc .aviso-tarifa{display:block;color:var(--accent);font-weight:600;font-size:14px}
 
 .cargando{display:flex;align-items:center;gap:11px;padding:15px;background:var(--surface2);
   border-radius:12px;font-size:15px;margin-bottom:12px}
@@ -306,7 +310,66 @@ var S = {
   viajes: [], cargas: [], adelantos: [],
   cfg: { pct: 17, tarifaModo: "tonelada", ejemplos: true }
 };
-function guardar(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
+function guardar(){
+  try{ localStorage.setItem(LS, JSON.stringify(S)); return true; }
+  catch(e){
+    /* se llenó el espacio: soltamos las imágenes de QR más viejas */
+    var conQR = S.viajes.filter(function(v){ return v.qr; })
+      .sort(function(a,b){ return (a.fecha||"").localeCompare(b.fecha||""); });
+    for(var i=0;i<conQR.length;i++){
+      delete conQR[i].qr;
+      try{ localStorage.setItem(LS, JSON.stringify(S)); toast("Liberé espacio borrando QR viejos"); return true; }
+      catch(e2){}
+    }
+    toast("No hay más espacio en el celular");
+    return false;
+  }
+}
+
+/* --- las cartas de porte se guardan aparte, porque pesan --- */
+var BD = null, cartaPendiente = null;
+function bd(){
+  return new Promise(function(res, rej){
+    if(BD) return res(BD);
+    if(!window.indexedDB) return rej(new Error("sin-bd"));
+    var req = indexedDB.open("cuidameElCamion", 1);
+    req.onupgradeneeded = function(){
+      var db = req.result;
+      if(!db.objectStoreNames.contains("cartas")) db.createObjectStore("cartas", { keyPath:"id" });
+    };
+    req.onsuccess = function(){ BD = req.result; res(BD); };
+    req.onerror = function(){ rej(req.error); };
+  });
+}
+function guardarCarta(datos){
+  return bd().then(function(db){
+    return new Promise(function(res, rej){
+      var tx = db.transaction("cartas", "readwrite");
+      tx.objectStore("cartas").put(datos);
+      tx.oncomplete = function(){ res(true); };
+      tx.onerror = function(){ rej(tx.error); };
+    });
+  });
+}
+function leerCarta(id){
+  return bd().then(function(db){
+    return new Promise(function(res, rej){
+      var req = db.transaction("cartas", "readonly").objectStore("cartas").get(id);
+      req.onsuccess = function(){ res(req.result || null); };
+      req.onerror = function(){ rej(req.error); };
+    });
+  });
+}
+function borrarCarta(id){
+  return bd().then(function(db){
+    return new Promise(function(res){
+      var tx = db.transaction("cartas", "readwrite");
+      tx.objectStore("cartas").delete(id);
+      tx.oncomplete = function(){ res(true); };
+      tx.onerror = function(){ res(false); };
+    });
+  }).catch(function(){});
+}
 function cargar(){
   try{
     var t = localStorage.getItem(LS);
@@ -385,6 +448,20 @@ function fleteDe(v){
 function gananciaDe(v){
   var pct = (v.pct === null || v.pct === undefined) ? S.cfg.pct : v.pct;
   return fleteDe(v) * (Number(pct)/100);
+}
+/* si la carta de porte vino sin tarifa, proponemos la del último viaje
+   al mismo destino (y si no hay, la del último viaje que sea) */
+function tarifaSugerida(destino){
+  var lista = S.viajes.filter(function(x){ return !x.ej && Number(x.tarifa) > 0; })
+    .sort(function(a,b){ return (b.fecha||"").localeCompare(a.fecha||""); });
+  if(!lista.length) return null;
+  if(destino){
+    var d = String(destino).toLowerCase().trim();
+    for(var i=0;i<lista.length;i++){
+      if(String(lista[i].destino||"").toLowerCase().trim() === d) return lista[i];
+    }
+  }
+  return lista[0];
 }
 function mesDe(iso){ return (iso||"").slice(0,7); }
 function delMes(arr, mes){ return arr.filter(function(x){ return mesDe(x.fecha) === mes; }); }
@@ -494,15 +571,19 @@ function vistaMes(){
 }
 
 function filaViaje(v){
+  var flete = fleteDe(v);
   return '<div class="fila">'+
     '<div class="cab"><span class="fecha">'+esc(fechaCorta(v.fecha))+(v.ej?' <span class="tag">ejemplo</span>':'')+'</span>'+
-      '<span class="monto num">'+plata(gananciaDe(v))+'</span></div>'+
+      (flete > 0
+        ? '<span class="monto num">'+plata(gananciaDe(v))+'</span>'
+        : '<span class="falta">Falta la tarifa</span>')+'</div>'+
     '<div class="ruta">'+esc(v.origen||"Sin origen")+'<span class="fl">→</span>'+esc(v.destino||"Sin destino")+'</div>'+
     '<div class="det num">'+nf(v.kilos)+' kg'+(v.grano?' · '+esc(v.grano):'')+
-      (v.kms?' · '+nf(v.kms)+' km':'')+' · flete '+plata(fleteDe(v))+'</div>'+
+      (v.kms?' · '+nf(v.kms)+' km':'')+(flete > 0 ? ' · flete '+plata(flete) : '')+'</div>'+
     '<div class="pie">'+
       (v.qr ? '<button class="chip qr" data-act="verQR" data-id="'+v.id+'">▦ Ver QR</button>' : '')+
       (v.ctg ? '<button class="chip" data-act="verCTG" data-id="'+v.id+'">CTG '+esc(v.ctg)+'</button>' : '')+
+      (v.tieneCarta ? '<button class="chip" data-act="verCarta" data-id="'+v.id+'">📄 La carta</button>' : '')+
       '<button class="chip" data-act="editarViaje" data-id="'+v.id+'">Editar</button>'+
       '<button class="chip borrar" data-act="borrarViaje" data-id="'+v.id+'">Borrar</button>'+
     '</div></div>';
@@ -650,17 +731,18 @@ function formViaje(v){
   abrir(
     '<h2>'+(v && v.origen ? "Revisá el viaje" : "Viaje nuevo")+'</h2>'+
     '<div class="desc">'+(b.leido ? "Esto saqué de la carta de porte. Fijate que esté bien y guardá." : "Completá lo que sepas. Después lo podés corregir.")+'</div>'+
-    (b.leido ? '<div class="ok">✓ Carta de porte leída</div>' : '')+
+    (b.leido ? '<div class="ok">✓ Carta de porte leída'+(b.tieneCarta ? " y guardada" : "")+'</div>' : '')+
+    (b.tarifaDeOtroViaje ? '<div class="aviso"><span>💲</span><div>La carta de porte vino <b>sin tarifa</b>. Puse la del último viaje parecido — revisala.</div></div>' : '')+
     '<div class="campo"><label>Fecha</label><input type="date" id="fViaje" value="'+esc(b.fecha||hoyISO())+'"></div>'+
     '<div class="campo"><label>De dónde salió</label><input id="fOrigen" value="'+esc(b.origen||"")+'" placeholder="Campo Los Trece"></div>'+
     '<div class="campo"><label>A dónde va</label><input id="fDestino" value="'+esc(b.destino||"")+'" placeholder="Puerto San Martín"></div>'+
     '<div class="par">'+
-      '<div class="campo"><label>Kilos</label><input type="number" inputmode="numeric" id="fKilos" value="'+esc(b.kilos||"")+'" placeholder="30000"></div>'+
-      '<div class="campo"><label>Grano</label><input id="fGrano" value="'+esc(b.grano||"")+'" placeholder="Maíz"></div>'+
+      '<div class="campo"><label>Kilos</label><input type="number" inputmode="numeric" id="fKilos" value="'+esc(b.kilos||"")+'" placeholder="kilos"></div>'+
+      '<div class="campo"><label>Grano</label><input id="fGrano" value="'+esc(b.grano||"")+'" placeholder="maíz, soja…"></div>'+
     '</div>'+
     '<div class="par">'+
-      '<div class="campo"><label>Tarifa</label><input type="number" inputmode="decimal" id="fTarifa" value="'+esc(b.tarifa||"")+'" placeholder="15200"></div>'+
-      '<div class="campo"><label>Kilómetros</label><input type="number" inputmode="numeric" id="fKms" value="'+esc(b.kms||"")+'" placeholder="50"></div>'+
+      '<div class="campo"><label>Tarifa</label><input type="number" inputmode="decimal" id="fTarifa" value="'+esc(b.tarifa||"")+'" placeholder="$ por tonelada"></div>'+
+      '<div class="campo"><label>Kilómetros</label><input type="number" inputmode="numeric" id="fKms" value="'+esc(b.kms||"")+'" placeholder="km"></div>'+
     '</div>'+
     '<div class="campo"><label>La tarifa es</label><select id="fModo">'+
       '<option value="tonelada"'+((b.tarifaModo||"tonelada")==="tonelada"?" selected":"")+'>Por tonelada</option>'+
@@ -668,7 +750,7 @@ function formViaje(v){
     '</select></div>'+
     '<div class="par">'+
       '<div class="campo"><label>Su porcentaje</label><input type="number" inputmode="decimal" id="fPct" value="'+esc(b.pct===undefined?S.cfg.pct:b.pct)+'" step="0.5"></div>'+
-      '<div class="campo"><label>CTG</label><input id="fCtg" value="'+esc(b.ctg||"")+'" placeholder="10133935670"></div>'+
+      '<div class="campo"><label>CTG</label><input id="fCtg" value="'+esc(b.ctg||"")+'" placeholder="sin CTG"></div>'+
     '</div>'+
     '<div class="calc" id="calcViaje"></div>'+
     '<div class="acciones">'+
@@ -700,10 +782,17 @@ function leerFormViaje(){
 function calcViaje(){
   var d = leerFormViaje();
   var fl = fleteDe(d), gan = fl * (d.pct/100);
+  var falta = [];
+  if(!d.kilos) falta.push("los kilos");
+  if(!d.tarifa) falta.push("la tarifa");
   document.getElementById("calcViaje").innerHTML =
     '<div><span>Toneladas</span><b class="num">'+nf(d.kilos/1000,1)+'</b></div>'+
     '<div><span>Flete del viaje</span><b class="num">'+plata(fl)+'</b></div>'+
-    '<div class="destaca"><span>Para él ('+nf(d.pct,1)+'%)</span><b class="num">'+plata(gan)+'</b></div>';
+    '<div class="destaca"><span>Para él ('+nf(d.pct,1)+'%)</span><b class="num">'+plata(gan)+'</b></div>'+
+    (falta.length
+      ? '<span class="aviso-tarifa">⚠ Falta '+falta.join(" y ")+
+        ': sin eso no puede calcular lo que gana.</span>'
+      : '');
 }
 
 /* ---------- formulario de carga de gasoil ---------- */
@@ -717,8 +806,8 @@ function formCarga(c){
     '<div class="desc">'+(ant ? "La última vez el tablero marcaba "+nf(ant.km)+" km." : "Esta es la primera carga: el consumo va a salir recién en la próxima.")+'</div>'+
     '<div class="campo"><label>Fecha</label><input type="date" id="cFecha" value="'+esc(b.fecha||hoyISO())+'"></div>'+
     '<div class="par">'+
-      '<div class="campo"><label>Kilómetros del tablero</label><input type="number" inputmode="numeric" id="cKm" value="'+esc(b.km||"")+'" placeholder="413500"></div>'+
-      '<div class="campo"><label>Litros cargados</label><input type="number" inputmode="decimal" id="cLitros" value="'+esc(b.litros||"")+'" placeholder="250"></div>'+
+      '<div class="campo"><label>Kilómetros del tablero</label><input type="number" inputmode="numeric" id="cKm" value="'+esc(b.km||"")+'" placeholder="km del tablero"></div>'+
+      '<div class="campo"><label>Litros cargados</label><input type="number" inputmode="decimal" id="cLitros" value="'+esc(b.litros||"")+'" placeholder="litros"></div>'+
     '</div>'+
     '<div class="campo"><label>Dónde cargó (opcional)</label><input id="cLugar" value="'+esc(b.lugar||"")+'" placeholder="YPF Ruta 8"></div>'+
     '<div class="calc" id="calcCarga"></div>'+
@@ -755,7 +844,7 @@ function formAdelanto(a){
     '<h2>'+(a && a.monto ? "Editar el adelanto" : "Adelanto del patrón")+'</h2>'+
     '<div class="desc">Es plata que le adelantan y después se la descuentan.</div>'+
     '<div class="campo"><label>Fecha</label><input type="date" id="aFecha" value="'+esc(b.fecha||hoyISO())+'"></div>'+
-    '<div class="campo"><label>Cuánto le dio</label><input type="number" inputmode="decimal" id="aMonto" value="'+esc(b.monto||"")+'" placeholder="100000"></div>'+
+    '<div class="campo"><label>Cuánto le dio</label><input type="number" inputmode="decimal" id="aMonto" value="'+esc(b.monto||"")+'" placeholder="cuánto"></div>'+
     '<div class="campo"><label>Nota (opcional)</label><input id="aNota" value="'+esc(b.nota||"")+'" placeholder="Para el viaje a Rosario"></div>'+
     '<div class="acciones">'+
       '<button class="btn pri" data-act="guardarAdelanto"><span class="ic">✓</span><span>Guardar el adelanto</span></button>'+
@@ -772,8 +861,10 @@ function verQR(v){
   h.innerHTML =
     '<h2>Carta de porte</h2>'+
     '<p class="brillo">Subí el brillo del celular al máximo para que lo lean bien.</p>'+
+    (v.qrAprox ? '<div class="aprox">Recorté la zona del QR de la carta de porte. Si no lo lee bien, abrí "La carta" y mostrá la hoja entera.</div>' : '')+
     (v.qr ? '<img src="'+v.qr+'" alt="Código QR de la carta de porte">'
-          : '<div class="vacio">Esta carta de porte no tiene QR guardado.</div>')+
+          : '<div class="vacio">Este viaje no tiene el QR guardado.'+
+            (v.tieneCarta ? ' Podés abrir "La carta" y mostrar la hoja completa.' : '')+'</div>')+
     (v.ctg ? '<div class="ctg-lab">CTG</div><div class="ctg-num num">'+esc(v.ctg)+'</div>' : '')+
     '<div class="acciones" style="margin-top:16px">'+
       (v.ctg ? '<button class="btn pri chico" data-act="copiarCTG" data-id="'+v.id+'"><span class="ic">⧉</span><span>Copiar el CTG</span></button>' : '')+
@@ -782,6 +873,37 @@ function verQR(v){
     '</div>';
   document.getElementById("mQR").hidden = false;
   document.body.style.overflow = "hidden";
+}
+/* muestra la carta de porte guardada, entera */
+function verCarta(v){
+  var h = document.getElementById("qrHoja");
+  h.innerHTML = '<h2>Carta de porte</h2>'+
+    '<div class="cargando"><div class="spin"></div><div>Buscándola…</div></div>';
+  document.getElementById("mQR").hidden = false;
+  document.body.style.overflow = "hidden";
+  leerCarta(v.id).then(function(c){
+    if(!c || !(c.pagina || c.archivo)){
+      h.innerHTML = '<h2>Carta de porte</h2>'+
+        '<div class="vacio">Este viaje no tiene la carta de porte guardada. '+
+        'Se guardan a partir de ahora, cuando la cargues desde el PDF.</div>'+
+        '<div class="acciones"><button class="btn chico" data-act="cerrarQR"><span class="ic">✕</span><span>Cerrar</span></button></div>';
+      return;
+    }
+    var urlPagina = c.pagina ? URL.createObjectURL(c.pagina) : null;
+    var urlOriginal = c.archivo ? URL.createObjectURL(c.archivo) : null;
+    h.innerHTML =
+      '<h2>Carta de porte</h2>'+
+      (v.ctg ? '<div class="ctg-lab">CTG</div><div class="ctg-num num">'+esc(v.ctg)+'</div>' : '')+
+      (urlPagina ? '<img class="hoja-carta" src="'+urlPagina+'" alt="Carta de porte">' : '')+
+      '<div class="acciones" style="margin-top:14px">'+
+        (v.ctg ? '<button class="btn pri chico" data-act="copiarCTG" data-id="'+v.id+'"><span class="ic">⧉</span><span>Copiar el CTG</span></button>' : '')+
+        (urlOriginal ? '<a class="btn chico" href="'+urlOriginal+'" target="_blank" rel="noopener"><span class="ic">📄</span><span>Abrir el archivo original</span></a>' : '')+
+        '<button class="btn chico" data-act="cerrarQR"><span class="ic">✕</span><span>Cerrar</span></button>'+
+      '</div>';
+  }).catch(function(){
+    h.innerHTML = '<h2>Carta de porte</h2><div class="vacio">No la pude abrir.</div>'+
+      '<div class="acciones"><button class="btn chico" data-act="cerrarQR"><span class="ic">✕</span><span>Cerrar</span></button></div>';
+  });
 }
 function dataURLaBlob(u){
   var p = u.split(","), bin = atob(p[1]), tipo = /:(.*?);/.exec(p[0])[1];
@@ -833,34 +955,50 @@ async function procesarArchivo(file){
       var pag = await pdf.getPage(1);
 
       var tc = await pag.getTextContent();
-      var texto = tc.items.map(function(i){ return i.str; }).join(" ").replace(/\s+/g," ").trim();
-      datos = leerCPE(texto);
+      datos = leerCPE(enFilas(tc));
 
       paso("Buscando el código QR…");
-      var img = await pintarPagina(pag, 2200);
-      qr = recortarQR(img.canvas);
+      var img = await pintarPagina(pag, 2600);
+      qr = recortarQR(img.canvas, true);
       blobPagina = img.blob;
     } else {
       paso("Mirando la foto…");
-      var img2 = await pintarImagen(file, 2200);
-      qr = recortarQR(img2.canvas);
+      var img2 = await pintarImagen(file, 2600);
+      qr = recortarQR(img2.canvas, false);
       blobPagina = img2.blob;
     }
 
-    if(!datos.ctg && !datos.kilos){
-      paso("No pude leerla sola, se la muestro a la inteligencia artificial…");
+    var faltanDatos = !datos.kilos || !datos.origen || !datos.destino;
+    if(faltanDatos){
+      paso("Le pido ayuda a la inteligencia artificial…");
       var conIA = await leerConIA(blobPagina);
-      if(conIA) datos = Object.assign(datos, conIA);
+      if(conIA){
+        Object.keys(conIA).forEach(function(k){
+          if(conIA[k] && !datos[k]) datos[k] = conIA[k];
+        });
+      }
     }
 
     cerrar();
     var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, datos);
-    if(qr) v.qr = qr;
+    if(qr){ v.qr = qr.img; if(qr.aproximado) v.qrAprox = true; }
+
+    /* si la carta de porte no trae tarifa, proponemos la del último viaje igual */
+    if(!v.tarifa){
+      var ref = tarifaSugerida(v.destino);
+      if(ref){ v.tarifa = ref.tarifa; v.tarifaModo = ref.tarifaModo || S.cfg.tarifaModo; v.tarifaDeOtroViaje = true; }
+    }
+
+    /* guardamos la carta de porte entera, para tenerla siempre a mano */
+    v.tieneCarta = true;
+    cartaPendiente = { id: v.id, archivo: file, pagina: blobPagina,
+                       nombre: file.name || "carta-de-porte.pdf", tipo: file.type || "" };
+
     formViaje(v);
     if(!datos.ctg && !datos.kilos){
       var h = document.getElementById("modHoja");
       h.insertAdjacentHTML("afterbegin",
-        '<div class="error">No pude sacar los datos automáticamente. Completalos a mano — el QR sí quedó guardado si lo encontré.</div>');
+        '<div class="error">No pude sacar los datos automáticamente. Completalos a mano — la carta de porte igual queda guardada.</div>');
     }
   }catch(e){
     abrir('<h2>No pude leer el archivo</h2>'+
@@ -900,42 +1038,100 @@ async function pintarImagen(file, anchoMax){
   } finally { URL.revokeObjectURL(url); }
 }
 
-function recortarQR(cv){
-  try{
-    var cx = cv.getContext("2d");
-    var d = cx.getImageData(0, 0, cv.width, cv.height);
-    var r = jsQR(d.data, cv.width, cv.height, { inversionAttempts: "attemptBoth" });
+/* Busca el QR por zonas y con zoom: en la carta de porte es chiquito
+   frente a toda la hoja, y de una sola pasada casi nunca aparece. */
+function ubicarQR(cv){
+  var W = cv.width, H = cv.height;
+  function probar(x0, y0, w, h, zoom){
+    if(w < 40 || h < 40) return null;
+    var t = document.createElement("canvas");
+    t.width = Math.round(w * zoom); t.height = Math.round(h * zoom);
+    var tx = t.getContext("2d", { willReadFrequently: true });
+    tx.imageSmoothingEnabled = false;
+    tx.fillStyle = "#fff"; tx.fillRect(0, 0, t.width, t.height);
+    tx.drawImage(cv, x0, y0, w, h, 0, 0, t.width, t.height);
+    var d = tx.getImageData(0, 0, t.width, t.height);
+    var r = jsQR(d.data, t.width, t.height, { inversionAttempts: "attemptBoth" });
     if(!r || !r.location) return null;
-    var pts = [r.location.topLeftCorner, r.location.topRightCorner, r.location.bottomLeftCorner, r.location.bottomRightCorner];
-    var xs = pts.map(function(p){ return p.x; }), ys = pts.map(function(p){ return p.y; });
-    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
-    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
-    var pad = Math.max(14, (x1-x0) * 0.12);
-    x0 = Math.max(0, x0-pad); y0 = Math.max(0, y0-pad);
-    x1 = Math.min(cv.width, x1+pad); y1 = Math.min(cv.height, y1+pad);
-    var w = Math.round(x1-x0), h = Math.round(y1-y0);
+    var pts = [r.location.topLeftCorner, r.location.topRightCorner,
+               r.location.bottomLeftCorner, r.location.bottomRightCorner];
+    var xs = pts.map(function(p){ return x0 + p.x / zoom; });
+    var ys = pts.map(function(p){ return y0 + p.y / zoom; });
+    return {
+      x0: Math.min.apply(null, xs), x1: Math.max.apply(null, xs),
+      y0: Math.min.apply(null, ys), y1: Math.max.apply(null, ys),
+      texto: r.data || ""
+    };
+  }
+  var intentos = [
+    [0, 0, W, H, 1],                                          // la hoja entera
+    [W*0.45, 0, W*0.55, H*0.22, 2.2],                          // arriba a la derecha (donde está en ARCA)
+    [W*0.45, 0, W*0.55, H*0.22, 3.4],                          // lo mismo, más zoom
+    [0, 0, W, H*0.25, 1.8],                                    // toda la franja de arriba
+    [W*0.5, H*0.75, W*0.5, H*0.25, 2.2],                       // abajo a la derecha
+    [0, 0, W*0.55, H*0.22, 2.2],                               // arriba a la izquierda
+    [0, 0, W, H, 1.7]                                          // la hoja entera con zoom
+  ];
+  for(var i=0;i<intentos.length;i++){
+    var a = intentos[i];
+    var r = probar(Math.round(a[0]), Math.round(a[1]), Math.round(a[2]), Math.round(a[3]), a[4]);
+    if(r) return r;
+  }
+  return null;
+}
+function recortarQR(cv, esCartaDePorte){
+  try{
+    var caja = ubicarQR(cv), aproximado = false;
+    if(!caja && esCartaDePorte){
+      /* No se pudo descifrar, pero en la carta de porte de ARCA el QR
+         siempre está arriba a la derecha: recortamos esa zona igual,
+         que es lo mismo que hacer la captura a mano. */
+      caja = { x0: cv.width*0.625, x1: cv.width*0.87, y0: cv.height*0.012, y1: cv.height*0.115 };
+      aproximado = true;
+    }
+    if(!caja) return null;
+    var pad = Math.max(12, (caja.x1 - caja.x0) * (aproximado ? 0.04 : 0.12));
+    var x0 = Math.max(0, caja.x0 - pad), y0 = Math.max(0, caja.y0 - pad);
+    var x1 = Math.min(cv.width, caja.x1 + pad), y1 = Math.min(cv.height, caja.y1 + pad);
+    var w = Math.round(x1 - x0), h = Math.round(y1 - y0);
     if(w < 20 || h < 20) return null;
     var out = document.createElement("canvas");
-    var lado = Math.min(720, Math.max(w, h) * 2);
+    var lado = Math.round(Math.min(760, Math.max(360, Math.max(w, h) * 2)));
     out.width = lado; out.height = lado;
     var ox = out.getContext("2d");
     ox.imageSmoothingEnabled = false;
-    ox.fillStyle = "#fff"; ox.fillRect(0,0,lado,lado);
-    ox.drawImage(cv, Math.round(x0), Math.round(y0), w, h, 0, 0, lado, lado);
-    return out.toDataURL("image/png");
+    ox.fillStyle = "#fff"; ox.fillRect(0, 0, lado, lado);
+    var escala = Math.min(lado / w, lado / h);
+    var dw = Math.round(w * escala), dh = Math.round(h * escala);
+    ox.drawImage(cv, Math.round(x0), Math.round(y0), w, h,
+                 Math.round((lado - dw) / 2), Math.round((lado - dh) / 2), dw, dh);
+    return { img: out.toDataURL("image/png"), aproximado: aproximado, texto: caja.texto || "" };
   }catch(e){ return null; }
 }
 
-/* --- lectura del texto de la Carta de Porte Electrónica de ARCA --- */
-function seccion(t, desde, hasta){
-  var i = t.search(desde);
-  if(i < 0) return "";
-  var resto = t.slice(i);
-  if(hasta){ var j = resto.search(hasta); if(j > 0) return resto.slice(0, j); }
-  return resto;
+/* --- lectura de la Carta de Porte Electrónica de ARCA ---
+   El PDF no entrega el texto en orden de lectura, así que primero
+   reconstruimos los renglones usando la posición de cada palabra. */
+function enFilas(tc){
+  var filas = [];
+  tc.items.forEach(function(it){
+    if(!it.str || !it.str.trim()) return;
+    var x = it.transform[4], y = it.transform[5];
+    var fila = null;
+    for(var i=0;i<filas.length;i++){
+      if(Math.abs(filas[i].y - y) <= 3.5){ fila = filas[i]; break; }
+    }
+    if(!fila){ fila = { y:y, partes:[] }; filas.push(fila); }
+    fila.partes.push({ x:x, s:it.str });
+  });
+  filas.sort(function(a,b){ return b.y - a.y; });
+  return filas.map(function(f){
+    f.partes.sort(function(a,b){ return a.x - b.x; });
+    return f.partes.map(function(p){ return p.s; }).join(" ").replace(/\s+/g," ").trim();
+  }).filter(function(l){ return l.length > 0; });
 }
 function limpiar(s){
-  return (s||"").replace(/\s+/g," ").replace(/^[\s:-]+|[\s:-]+$/g,"").trim();
+  return (s||"").replace(/\s+/g," ").replace(/^[\s:.-]+|[\s:.-]+$/g,"").trim();
 }
 function numeroDe(s){
   if(!s) return 0;
@@ -943,48 +1139,80 @@ function numeroDe(s){
   var n = parseFloat(t);
   return isNaN(n) ? 0 : n;
 }
-function leerCPE(t){
-  var d = {};
-  var mCtg = /CTG\s*:?\s*(\d{8,15})/i.exec(t);
-  if(mCtg) d.ctg = mCtg[1];
-  var mF = /Fecha\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(t);
-  if(mF) d.fecha = mF[3] + "-" + mF[2] + "-" + mF[1];
+function bonito(s){ return titulo(String(s||"").toLowerCase()); }
+function leerCPE(lineas){
+  if(typeof lineas === "string") lineas = lineas.split(/\n/);
+  var d = {}, plano = lineas.join(" \n ");
 
-  var B = seccion(t, /B\s*-\s*GRANO/i, /C\s*-\s*PROCEDENCIA/i);
-  var C = seccion(t, /C\s*-\s*PROCEDENCIA/i, /D\s*-\s*DESTINO/i);
-  var D = seccion(t, /D\s*-\s*DESTINO/i, /E\s*-\s*DATOS/i);
-  var E = seccion(t, /E\s*-\s*DATOS/i, /F\s*-\s*CONTINGENCIAS/i);
-  var A = seccion(t, /A\s*-\s*INTERVINIENTES/i, /B\s*-\s*GRANO/i);
+  function dondeEsta(re){
+    for(var i=0;i<lineas.length;i++) if(re.test(lineas[i])) return i;
+    return -1;
+  }
+  function bloque(desde, hasta){
+    var a = dondeEsta(desde);
+    if(a < 0) return [];
+    var b = hasta ? dondeEsta(hasta) : -1;
+    return lineas.slice(a, (b > a ? b : lineas.length));
+  }
+  function buscar(arr, re){
+    for(var i=0;i<arr.length;i++){
+      var m = re.exec(arr[i]);
+      if(m) return m;
+    }
+    return null;
+  }
 
-  var mNeto = /Peso\s*Neto\s*:?\s*([\d.,]+)/i.exec(B || t);
-  if(mNeto) d.kilos = numeroDe(mNeto[1]);
-  var mTipo = /Tipo\s*:?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{3,25}?)\s*(?:Campaña|Peso|DECLARA)/i.exec(B);
-  if(mTipo) d.grano = limpiar(mTipo[1]);
-  else { var mGr = /Grano\s*\/?\s*:?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,20})/i.exec(B); if(mGr) d.grano = limpiar(mGr[1]); }
+  var A = bloque(/A\s*[-–]\s*INTERVINIENTES/i, /B\s*[-–]\s*GRANO/i);
+  var B = bloque(/B\s*[-–]\s*GRANO/i, /C\s*[-–]\s*PROCEDENCIA/i);
+  var C = bloque(/C\s*[-–]\s*PROCEDENCIA/i, /D\s*[-–]\s*DESTINO/i);
+  var D = bloque(/D\s*[-–]\s*DESTINO/i, /E\s*[-–]\s*DATOS/i);
+  var E = bloque(/E\s*[-–]\s*DATOS/i, /F\s*[-–]\s*CONTINGENCIAS/i);
 
-  var mObs = /Observaciones\s*:?\s*([^]{2,90}?)(?:\s*C\s*-\s*PROCEDENCIA|$)/i.exec(B);
-  var obs = mObs ? limpiar(mObs[1]) : "";
-  var mLocC = /Localidad\s*:?\s*([^]{2,40}?)\s*(?:Provincia|Descripción|$)/i.exec(C);
-  var locC = mLocC ? limpiar(mLocC[1]) : "";
-  if(/campo/i.test(obs)) d.origen = obs.replace(/\s+COSECHA.*$/i, "");
-  else if(locC) d.origen = locC;
-  if(locC && d.origen && d.origen !== locC) d.origenLocalidad = locC;
+  var m;
+  if((m = /CTG\s*:?\s*(\d{8,15})/i.exec(plano))) d.ctg = m[1];
+  if((m = /N[°ºo]\s*CPE\s*:?\s*([\d]+-[\d]+)/i.exec(plano))) d.cpe = m[1];
+  if((m = /Fecha\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(plano))) d.fecha = m[3]+"-"+m[2]+"-"+m[1];
 
-  var mLocD = /Localidad\s*:?\s*([^]{2,40}?)\s*(?:Provincia|$)/i.exec(D);
-  var mProvD = /Provincia\s*:?\s*([A-ZÁÉÍÓÚÑ ]{3,30}?)(?:\s{2,}|\s*E\s*-|$)/i.exec(D);
-  var mDest = /Destinatario\s*:?\s*(?:\d{11}\s*-\s*)?([^]{3,60}?)\s*(?:Destino\s*:|Empresa)/i.exec(A);
+  /* kilos: el Peso Neto de la sección B (el de la G es el de descarga) */
+  if((m = buscar(B.length ? B : lineas, /Peso\s*Neto\s*:?\s*([\d][\d.,]*)/i))) d.kilos = numeroDe(m[1]);
+  if((m = buscar(B.length ? B : lineas, /Peso\s*Bruto\s*:?\s*([\d][\d.,]*)/i))) d.bruto = numeroDe(m[1]);
+  if((m = buscar(B.length ? B : lineas, /Peso\s*Tara\s*:?\s*([\d][\d.,]*)/i))) d.tara = numeroDe(m[1]);
+  if(!d.kilos && d.bruto && d.tara) d.kilos = d.bruto - d.tara;
+
+  /* grano: "Tipo:" es el más confiable; nunca la palabra ESPECIE del título */
+  if((m = buscar(B, /Tipo\s*:\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,20})/i))) d.grano = limpiar(m[1]);
+  if(!d.grano && (m = buscar(B, /Grano\s*\/?\s*:?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,20})/i))) d.grano = limpiar(m[1]);
+  if(d.grano && /^(especie|grano|tipo)$/i.test(d.grano)) delete d.grano;
+  if(d.grano) d.grano = d.grano.charAt(0).toUpperCase() + d.grano.slice(1).toLowerCase();
+
+  /* origen: el nombre del campo suele venir en Observaciones */
+  var obs = "";
+  if((m = buscar(B, /Observaciones\s*:?\s*(.+)$/i))) obs = limpiar(m[1]);
+  var locC = "", provC = "";
+  if((m = buscar(C, /Localidad\s*:?\s*([A-ZÁÉÍÓÚÑ0-9][^:]{1,38}?)\s*(?:Provincia|Descripci|$)/i))) locC = limpiar(m[1]);
+  if((m = buscar(C, /Provincia\s*:?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .]{2,28}?)\s*(?:Descripci|RENSPA|$)/i))) provC = limpiar(m[1]);
+  if(/campo|estancia|lote/i.test(obs)) d.origen = bonito(obs.replace(/\s+COSECHA.*$/i, "").replace(/\s+\d{2}[-/]\d{2}\s*$/, ""));
+  else if(locC) d.origen = bonito(locC);
+  if(locC && d.origen && bonito(locC) !== d.origen) d.origenLocalidad = bonito(locC) + (provC ? ", " + bonito(provC) : "");
+
+  /* destino */
+  var locD = "", provD = "";
+  if((m = buscar(D, /Localidad\s*:?\s*([A-ZÁÉÍÓÚÑ0-9][^:]{1,38}?)\s*(?:Provincia|$)/i))) locD = limpiar(m[1]);
+  if((m = buscar(D, /Provincia\s*:?\s*([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ .]{2,28})\s*$/i))) provD = limpiar(m[1]);
   var partes = [];
-  if(mLocD) partes.push(limpiar(mLocD[1]));
-  if(mProvD) partes.push(limpiar(mProvD[1]));
+  if(locD) partes.push(bonito(locD));
+  if(provD) partes.push(bonito(provD));
   if(partes.length) d.destino = partes.join(", ");
-  if(mDest) d.empresa = limpiar(mDest[1]).replace(/\s*(SOCIEDAD ANONIMA|S\.?A\.?)\b.*$/i, "");
+  if((m = buscar(A, /Destinatario\s*:?\s*(?:\d{11}\s*[-–]\s*)?(.{3,60}?)\s*$/i))){
+    d.empresa = limpiar(m[1]).replace(/\s*(SOCIEDAD\s+ANONIMA|S\.?\s?A\.?)\b.*$/i, "");
+    d.empresa = bonito(d.empresa);
+  }
 
-  var mKms = /Kms?\.?\s*a\s*recorrer\s*:?\s*([\d.,]+)/i.exec(E || t);
-  if(mKms) d.kms = numeroDe(mKms[1]);
-  var mTar = /Tarifa\s*:?\s*([\d.,]+)/i.exec(E || t);
-  if(mTar) d.tarifa = numeroDe(mTar[1]);
-  var mCpe = /N[°ºo]?\s*CPE\s*:?\s*([\d-]{5,20})/i.exec(t);
-  if(mCpe) d.cpe = mCpe[1];
+  /* transporte: kilómetros y tarifa */
+  if((m = buscar(E.length ? E : lineas, /Kms?\.?\s*a\s*recorrer\s*:?\s*([\d][\d.,]*)/i))) d.kms = numeroDe(m[1]);
+  if((m = buscar(E.length ? E : lineas, /Tarifa\s*:?\s*([\d][\d.,]*)/i))) d.tarifa = numeroDe(m[1]);
+  if((m = buscar(E, /Dominios?\s*:?\s*([A-Z0-9]{6,8}(?:\s*[-–]\s*[A-Z0-9]{6,8})?)/i))) d.patente = limpiar(m[1]);
+
   return d;
 }
 
@@ -1278,9 +1506,13 @@ var ACC = {
     var d = leerFormViaje();
     if(!d.kilos && !d.origen && !d.destino){ toast("Poné al menos de dónde salió"); return; }
     var v = Object.assign({}, borrador, d);
-    delete v.ej; delete v.leido;
+    delete v.ej; delete v.leido; delete v.tarifaDeOtroViaje;
     quitar(S.viajes, v.id);
     S.viajes.push(v);
+    if(cartaPendiente && cartaPendiente.id === v.id){
+      guardarCarta(cartaPendiente).catch(function(){ v.tieneCarta = false; guardar(); });
+      cartaPendiente = null;
+    }
     guardar(); cerrar(); pintar(); toast("Viaje guardado");
   },
   guardarCarga: function(){
@@ -1309,7 +1541,12 @@ var ACC = {
     guardar(); cerrar(); pintar(); toast("Adelanto guardado");
   },
 
-  borrarViaje: function(el){ if(confirm("¿Borrar este viaje?")){ quitar(S.viajes, el.getAttribute("data-id")); guardar(); pintar(); } },
+  borrarViaje: function(el){
+    if(!confirm("¿Borrar este viaje? También se borra la carta de porte guardada.")) return;
+    var i = el.getAttribute("data-id");
+    borrarCarta(i); quitar(S.viajes, i); guardar(); pintar();
+  },
+  verCarta: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) verCarta(v); },
   borrarCarga: function(el){ if(confirm("¿Borrar esta carga de gasoil?")){ quitar(S.cargas, el.getAttribute("data-id")); guardar(); pintar(); } },
   borrarAdelanto: function(el){ if(confirm("¿Borrar este adelanto?")){ quitar(S.adelantos, el.getAttribute("data-id")); guardar(); pintar(); } },
   borrarEjemplos: function(){
