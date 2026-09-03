@@ -117,6 +117,7 @@ h1,h2,h3{font-family:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;mar
 .mini div{background:var(--surface2);border:1px solid var(--line-soft);border-radius:14px;padding:14px 15px}
 .mini .lab{font-size:12px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
 .mini .val{font-family:"Barlow Condensed",sans-serif;font-size:28px;font-weight:600;line-height:1.15}
+.mini .sublab{font-size:11.5px;color:var(--muted);line-height:1.25;margin-top:1px}
 
 /* ---------- botones ---------- */
 .acciones{display:grid;gap:12px;margin-bottom:20px}
@@ -559,9 +560,11 @@ function vistaMes(){
     '</div>'+
   '</div>'+
   '<div class="mini">'+
-    '<div><div class="lab">Kilos</div><div class="val num">'+nf(kilos)+'</div></div>'+
-    '<div><div class="lab">Toneladas</div><div class="val num">'+nf(kilos/1000,1)+'</div></div>'+
-    '<div><div class="lab">Consumo</div><div class="val num">'+(prom?nf(prom,2):"—")+'</div></div>'+
+    '<div><div class="lab">Viajes</div><div class="val num">'+vs.length+'</div></div>'+
+    '<div><div class="lab">Kilos</div><div class="val num">'+nf(kilos)+'</div>'+
+      '<div class="sublab num">'+nf(kilos/1000,1)+' tn</div></div>'+
+    '<div><div class="lab">Consumo</div><div class="val num">'+(prom?nf(prom,2):"—")+'</div>'+
+      '<div class="sublab">'+(prom?"km por litro":"sin datos")+'</div></div>'+
   '</div>'+
   '<div class="acciones">'+
     '<button class="btn pri" data-act="nuevoPDF"><span class="ic">📄</span><span>Cargar carta de porte<small>Sube el PDF y se llena solo</small></span></button>'+
