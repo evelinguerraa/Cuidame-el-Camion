@@ -2,6 +2,7 @@
   "name": "Cuídame el Camión",
   "short_name": "El Camión",
   "description": "Viajes, cartas de porte, gasoil y adelantos.",
+  "id": "/Cuidame-el-Camion/",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
@@ -9,9 +10,11 @@
   "background_color": "#0E1310",
   "theme_color": "#0E1310",
   "lang": "es-AR",
+  "dir": "ltr",
   "icons": [
-    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
-    { "src": "icono.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+    { "src": "icono-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icono-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icono-mask.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ],
   "share_target": {
     "action": "compartir",
