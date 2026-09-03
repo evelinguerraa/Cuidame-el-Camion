@@ -44,7 +44,18 @@ body{
 }
 h1,h2,h3{font-family:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;margin:0;text-wrap:balance;letter-spacing:.01em}
 .num{font-variant-numeric:tabular-nums}
-#app{max-width:620px;margin:0 auto;padding:0 18px 132px}
+#app{max-width:620px;margin:0 auto;padding:0 18px 104px}
+
+/* cada pantalla se estira para ocupar todo el alto del celular */
+.pantalla{display:flex;flex-direction:column;min-height:calc(100vh - 186px);min-height:calc(100dvh - 186px)}
+.pantalla > .plata{flex:1 1 auto;display:flex;flex-direction:column}
+.pantalla > .plata > *{flex:1 1 auto}
+.pantalla > .plata .tile{display:flex;flex-direction:column;justify-content:center}
+.pantalla > .consumo{flex:1 1 auto;max-height:250px;display:flex;flex-direction:column;justify-content:center}
+.pantalla > .vacio{flex:1 1 auto;display:flex;flex-direction:column;justify-content:center}
+.pantalla > .lista{flex:1 1 auto;align-content:stretch}
+.pantalla > .lista .fila{display:flex;flex-direction:column;justify-content:center}
+.pantalla > :last-child{margin-bottom:0}
 
 /* ---------- barra superior ---------- */
 .top{
@@ -391,13 +402,13 @@ function kml100(kml){ return kml > 0 ? (100/kml) : null; }
    PANTALLAS
    ============================================================ */
 var TABS = [
-  { k:"mes",       ic:"📊", t:"Mes" },
   { k:"viajes",    ic:"🚛", t:"Viajes" },
   { k:"gasoil",    ic:"⛽", t:"Gasoil" },
   { k:"adelantos", ic:"💵", t:"Adelantos" },
+  { k:"mes",       ic:"📊", t:"Mes" },
   { k:"ajustes",   ic:"⚙️", t:"Ajustes" }
 ];
-var pantalla = "mes";
+var pantalla = "viajes";
 var mesVista = hoyISO().slice(0,7);
 
 function nombreMes(m){
@@ -574,11 +585,13 @@ function vistaAjustes(){
 
 function pintar(){
   var v = document.getElementById("vista");
-  if(pantalla === "mes") v.innerHTML = vistaMes();
-  else if(pantalla === "viajes") v.innerHTML = vistaViajes();
-  else if(pantalla === "gasoil") v.innerHTML = vistaGasoil();
-  else if(pantalla === "adelantos") v.innerHTML = vistaAdelantos();
-  else v.innerHTML = vistaAjustes();
+  var html;
+  if(pantalla === "mes") html = vistaMes();
+  else if(pantalla === "viajes") html = vistaViajes();
+  else if(pantalla === "gasoil") html = vistaGasoil();
+  else if(pantalla === "adelantos") html = vistaAdelantos();
+  else html = vistaAjustes();
+  v.innerHTML = '<div class="pantalla">' + html + '</div>';
   document.getElementById("subtitulo").textContent =
     pantalla === "mes" ? "Viajes, gasoil y adelantos" :
     pantalla === "viajes" ? "Cartas de porte y fletes" :
