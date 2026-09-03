@@ -1,0 +1,1311 @@
+<title>Cuídame el Camión</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jsQR/1.4.0/jsQR.min.js"></script>
+<style>
+:root{
+  --bg:#E9ECE5; --surface:#FFFFFF; --surface2:#F3F5EF; --raised:#FFFFFF;
+  --ink:#111A14; --muted:#5A665D; --line:#D3DACD; --line-soft:#E2E7DC;
+  --accent:#C98A05; --accent-soft:#F6E7C0; --accent-ink:#231803;
+  --deep:#17402F; --deep-ink:#FFFFFF;
+  --good:#1B6F47; --good-soft:#DCEFE4;
+  --bad:#A8342A; --bad-soft:#F6DFDC;
+  --shadow:0 1px 2px rgba(17,26,20,.06), 0 6px 18px rgba(17,26,20,.06);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0E1310; --surface:#161D18; --surface2:#1C2620; --raised:#1F2A23;
+    --ink:#E4EAE2; --muted:#95A29A; --line:#28332C; --line-soft:#222C26;
+    --accent:#E8AE2B; --accent-soft:#3A2E11; --accent-ink:#1A1206;
+    --deep:#8FD9B6; --deep-ink:#0E1310;
+    --good:#5FCB92; --good-soft:#16301F;
+    --bad:#F0796A; --bad-soft:#331815;
+    --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.3);
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0E1310; --surface:#161D18; --surface2:#1C2620; --raised:#1F2A23;
+  --ink:#E4EAE2; --muted:#95A29A; --line:#28332C; --line-soft:#222C26;
+  --accent:#E8AE2B; --accent-soft:#3A2E11; --accent-ink:#1A1206;
+  --deep:#8FD9B6; --deep-ink:#0E1310;
+  --good:#5FCB92; --good-soft:#16301F;
+  --bad:#F0796A; --bad-soft:#331815;
+  --shadow:0 1px 2px rgba(0,0,0,.4), 0 6px 18px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+body{
+  background:var(--bg); color:var(--ink);
+  font-family:"IBM Plex Sans",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  font-size:16px; line-height:1.45; margin:0;
+  -webkit-text-size-adjust:100%;
+}
+h1,h2,h3{font-family:"Barlow Condensed","IBM Plex Sans",system-ui,sans-serif;margin:0;text-wrap:balance;letter-spacing:.01em}
+.num{font-variant-numeric:tabular-nums}
+#app{max-width:560px;margin:0 auto;padding:0 14px 104px}
+
+/* ---------- barra superior ---------- */
+.top{
+  position:sticky;top:0;z-index:20;background:var(--bg);
+  padding:14px 0 10px;border-bottom:1px solid var(--line-soft);
+  display:flex;align-items:center;gap:10px;
+}
+.top h1{font-size:26px;font-weight:700;line-height:1;text-transform:uppercase}
+.top .sub{color:var(--muted);font-size:12.5px;letter-spacing:.06em;text-transform:uppercase;font-weight:600}
+.badge-truck{
+  width:38px;height:38px;border-radius:9px;background:var(--deep);color:var(--deep-ink);
+  display:grid;place-items:center;font-size:19px;flex:none;
+}
+
+/* ---------- selector de mes ---------- */
+.mes{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:14px 0 12px}
+.mes b{font-family:"Barlow Condensed",sans-serif;font-size:24px;font-weight:600;text-transform:capitalize}
+.mes button{
+  width:42px;height:42px;border-radius:10px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:19px;cursor:pointer;
+}
+
+/* ---------- tarjetas de plata ---------- */
+.plata{display:grid;gap:10px;margin-bottom:14px}
+.tile{
+  background:var(--surface);border:1px solid var(--line);border-radius:14px;
+  padding:14px 16px;box-shadow:var(--shadow);
+}
+.tile .lab{font-size:12px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.tile .val{font-family:"Barlow Condensed",sans-serif;font-weight:700;font-size:38px;line-height:1.05;margin-top:2px}
+.tile .hint{font-size:13px;color:var(--muted);margin-top:2px}
+.tile.saldo{border-left:5px solid var(--good)}
+.tile.saldo.negativo{border-left-color:var(--bad)}
+.tile.saldo .val{color:var(--good)}
+.tile.saldo.negativo .val{color:var(--bad)}
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.duo .tile .val{font-size:27px}
+
+.mini{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px}
+.mini div{background:var(--surface2);border:1px solid var(--line-soft);border-radius:12px;padding:10px 12px}
+.mini .lab{font-size:11px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:600}
+.mini .val{font-family:"Barlow Condensed",sans-serif;font-size:23px;font-weight:600;line-height:1.15}
+
+/* ---------- botones ---------- */
+.acciones{display:grid;gap:9px;margin-bottom:16px}
+button{font-family:inherit}
+.btn{
+  display:flex;align-items:center;gap:11px;width:100%;min-height:58px;
+  padding:13px 16px;border-radius:13px;border:1px solid var(--line);
+  background:var(--surface);color:var(--ink);font-size:16px;font-weight:600;
+  cursor:pointer;text-align:left;box-shadow:var(--shadow);
+}
+.btn .ic{font-size:22px;flex:none;line-height:1}
+.btn small{display:block;font-weight:400;font-size:13px;color:var(--muted);margin-top:1px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.pri small{color:rgba(35,24,3,.72)}
+:root[data-theme="dark"] .btn.pri small, :root:not([data-theme="light"]) .btn.pri small{color:rgba(26,18,6,.72)}
+.btn:active{transform:translateY(1px)}
+.btn:focus-visible,.tab:focus-visible,.mes button:focus-visible,.chip:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.btn.chico{min-height:46px;font-size:15px;padding:9px 13px}
+.btn.peligro{color:var(--bad);border-color:var(--bad)}
+
+/* ---------- listas ---------- */
+.seccion{font-family:"Barlow Condensed",sans-serif;font-size:19px;font-weight:600;
+  text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin:20px 0 9px}
+.lista{display:grid;gap:9px}
+.fila{
+  background:var(--surface);border:1px solid var(--line);border-radius:13px;
+  padding:12px 14px;box-shadow:var(--shadow);
+}
+.fila .cab{display:flex;justify-content:space-between;align-items:baseline;gap:10px}
+.fila .fecha{font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--muted)}
+.fila .monto{font-family:"Barlow Condensed",sans-serif;font-size:25px;font-weight:700;line-height:1}
+.fila .ruta{font-weight:600;font-size:16.5px;margin-top:3px;line-height:1.3}
+.fila .ruta .fl{color:var(--accent);font-weight:700;padding:0 3px}
+.fila .det{font-size:13.5px;color:var(--muted);margin-top:3px}
+.fila .pie{display:flex;gap:7px;margin-top:11px;flex-wrap:wrap}
+.chip{
+  border:1px solid var(--line);background:var(--surface2);color:var(--ink);
+  border-radius:9px;padding:8px 12px;font-size:14px;font-weight:600;cursor:pointer;
+  display:inline-flex;align-items:center;gap:6px;min-height:40px;
+}
+.chip.qr{background:var(--accent-soft);border-color:var(--accent)}
+.chip.borrar{margin-left:auto;color:var(--muted);font-weight:500}
+.tag{font-size:11px;font-weight:700;letter-spacing:.07em;text-transform:uppercase;
+  background:var(--accent-soft);color:var(--accent-ink);border-radius:5px;padding:2px 6px}
+:root[data-theme="dark"] .tag,:root:not([data-theme="light"]) .tag{color:var(--accent)}
+.vacio{color:var(--muted);font-size:14.5px;text-align:center;padding:26px 16px;
+  border:1px dashed var(--line);border-radius:13px;background:var(--surface2)}
+
+.aviso{background:var(--accent-soft);border:1px solid var(--accent);border-radius:12px;
+  padding:11px 13px;font-size:13.5px;display:flex;gap:9px;align-items:flex-start;margin-bottom:14px}
+.aviso button{background:none;border:0;color:inherit;text-decoration:underline;font-weight:700;
+  cursor:pointer;font-size:13.5px;padding:0;flex:none}
+
+/* ---------- consumo ---------- */
+.consumo{background:var(--deep);color:var(--deep-ink);border-radius:14px;padding:15px 16px;margin-bottom:14px}
+.consumo .lab{font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;font-weight:700;opacity:.75}
+.consumo .val{font-family:"Barlow Condensed",sans-serif;font-size:44px;font-weight:700;line-height:1}
+.consumo .val span{font-size:19px;font-weight:600;opacity:.8}
+.consumo .row{display:flex;justify-content:space-between;align-items:flex-end;gap:14px}
+.consumo .alt{text-align:right;font-size:13.5px;opacity:.85;line-height:1.35}
+
+/* ---------- navegacion ---------- */
+.nav{
+  position:fixed;left:0;right:0;bottom:0;z-index:30;
+  background:var(--surface);border-top:1px solid var(--line);
+  display:grid;grid-template-columns:repeat(5,1fr);
+  padding:6px 4px calc(6px + env(safe-area-inset-bottom));
+}
+.tab{
+  background:none;border:0;cursor:pointer;color:var(--muted);
+  display:grid;justify-items:center;gap:2px;padding:6px 2px;border-radius:10px;
+  font-size:11px;font-weight:600;letter-spacing:.02em;
+}
+.tab .ic{font-size:21px;line-height:1}
+.tab[aria-current="true"]{color:var(--ink);background:var(--surface2)}
+.tab[aria-current="true"] .ic{transform:translateY(-1px)}
+
+/* ---------- modales ---------- */
+.modal{
+  position:fixed;inset:0;z-index:50;background:rgba(8,14,10,.55);
+  display:flex;align-items:flex-end;justify-content:center;padding:0;
+}
+.modal[hidden]{display:none}
+.hoja{
+  background:var(--surface);width:100%;max-width:560px;max-height:92vh;overflow-y:auto;
+  border-radius:18px 18px 0 0;padding:18px 16px calc(20px + env(safe-area-inset-bottom));
+  border-top:1px solid var(--line);
+}
+.hoja h2{font-size:24px;font-weight:700;text-transform:uppercase;margin-bottom:3px}
+.hoja .desc{color:var(--muted);font-size:14px;margin-bottom:15px}
+.campo{margin-bottom:12px}
+.campo label{display:block;font-size:12px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:var(--muted);margin-bottom:5px}
+.campo input,.campo select,.campo textarea{
+  width:100%;min-height:52px;padding:12px 13px;border-radius:11px;
+  border:1px solid var(--line);background:var(--surface2);color:var(--ink);
+  font-family:inherit;font-size:17px;font-variant-numeric:tabular-nums;
+}
+.campo input:focus,.campo select:focus,.campo textarea:focus{outline:2px solid var(--accent);outline-offset:0;border-color:var(--accent)}
+.par{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.calc{background:var(--surface2);border:1px solid var(--line-soft);border-radius:11px;
+  padding:11px 13px;margin:4px 0 14px;font-size:14px;display:grid;gap:4px}
+.calc div{display:flex;justify-content:space-between;gap:12px}
+.calc b{font-family:"Barlow Condensed",sans-serif;font-size:21px;font-weight:700}
+.calc .destaca b{color:var(--good)}
+
+/* dictado */
+.dic{text-align:center;padding:10px 0 4px}
+.micro{width:96px;height:96px;border-radius:50%;background:var(--accent);color:var(--accent-ink);
+  display:grid;place-items:center;font-size:44px;margin:6px auto 14px;border:0;cursor:pointer}
+.micro.on{animation:lat 1.1s ease-in-out infinite}
+@keyframes lat{0%,100%{box-shadow:0 0 0 0 rgba(201,138,5,.45)}50%{box-shadow:0 0 0 18px rgba(201,138,5,0)}}
+@media (prefers-reduced-motion:reduce){.micro.on{animation:none}}
+.escuchado{background:var(--surface2);border:1px solid var(--line);border-radius:12px;
+  padding:13px;min-height:78px;font-size:16.5px;text-align:left;margin-bottom:13px}
+.escuchado.gris{color:var(--muted)}
+.ejemplos{font-size:13.5px;color:var(--muted);text-align:left;line-height:1.6;margin-bottom:13px}
+.ejemplos b{color:var(--ink);font-weight:600}
+
+/* QR a pantalla completa */
+#mQR .hoja{background:#FFFFFF;color:#111111;border-radius:18px 18px 0 0}
+#mQR h2,#mQR .ctg-num{color:#111111}
+#mQR img{width:100%;max-width:330px;display:block;margin:6px auto 14px;
+  image-rendering:pixelated;background:#fff;border:10px solid #fff;border-radius:6px}
+.ctg-num{font-family:"Barlow Condensed",sans-serif;font-size:40px;font-weight:700;
+  letter-spacing:.03em;text-align:center;line-height:1.05}
+.ctg-lab{text-align:center;font-size:12px;letter-spacing:.1em;text-transform:uppercase;
+  font-weight:700;color:#5A665D;margin-bottom:2px}
+#mQR .btn{background:#F3F5EF;border-color:#D3DACD;color:#111111}
+#mQR .btn.pri{background:#C98A05;border-color:#C98A05;color:#231803}
+#mQR .brillo{text-align:center;font-size:13px;color:#5A665D;margin:0 0 14px}
+
+.cargando{display:flex;align-items:center;gap:11px;padding:15px;background:var(--surface2);
+  border-radius:12px;font-size:15px;margin-bottom:12px}
+.spin{width:20px;height:20px;border:3px solid var(--line);border-top-color:var(--accent);
+  border-radius:50%;animation:gira .8s linear infinite;flex:none}
+@keyframes gira{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.spin{animation-duration:2.4s}}
+.error{background:var(--bad-soft);border:1px solid var(--bad);color:var(--bad);
+  border-radius:11px;padding:11px 13px;font-size:14px;margin-bottom:12px}
+.ok{background:var(--good-soft);border:1px solid var(--good);color:var(--good);
+  border-radius:11px;padding:11px 13px;font-size:14px;margin-bottom:12px;font-weight:600}
+.oculto{display:none !important}
+#toast{position:fixed;left:50%;bottom:92px;transform:translateX(-50%);z-index:80;
+  background:var(--deep);color:var(--deep-ink);padding:11px 18px;border-radius:11px;
+  font-size:14.5px;font-weight:600;box-shadow:var(--shadow);max-width:90vw;text-align:center}
+#toast[hidden]{display:none}
+.ajuste-nota{font-size:13.5px;color:var(--muted);margin:-6px 0 16px;line-height:1.5}
+</style>
+
+<div id="app">
+  <div class="top">
+    <div class="badge-truck">🚛</div>
+    <div>
+      <h1>Cuídame el Camión</h1>
+      <div class="sub" id="subtitulo">Viajes, gasoil y adelantos</div>
+    </div>
+  </div>
+  <div id="vista"></div>
+</div>
+
+<nav class="nav" id="nav"></nav>
+<div id="toast" hidden></div>
+
+<!-- Modal generico -->
+<div class="modal" id="mod" hidden><div class="hoja" id="modHoja"></div></div>
+<!-- Modal QR -->
+<div class="modal" id="mQR" hidden><div class="hoja" id="qrHoja"></div></div>
+
+<input type="file" id="archivo" accept="application/pdf,image/*" hidden>
+<canvas id="lienzo" class="oculto"></canvas>
+
+<script>
+(function(){
+"use strict";
+
+/* ============================================================
+   GUARDADO  (en el celular donde se usa la app)
+   ============================================================ */
+var LS = "cuadernoRuta.v1";
+var S = {
+  viajes: [], cargas: [], adelantos: [],
+  cfg: { pct: 17, tarifaModo: "tonelada", ejemplos: true }
+};
+function guardar(){ try{ localStorage.setItem(LS, JSON.stringify(S)); }catch(e){} }
+function cargar(){
+  try{
+    var t = localStorage.getItem(LS);
+    if(t){ var d = JSON.parse(t); if(d && d.cfg){ S = d; S.viajes=S.viajes||[]; S.cargas=S.cargas||[]; S.adelantos=S.adelantos||[]; return true; } }
+  }catch(e){}
+  return false;
+}
+function id(){ return Date.now().toString(36) + Math.random().toString(36).slice(2,7); }
+
+/* ============================================================
+   EJEMPLOS  (se borran de un toque)
+   ============================================================ */
+function sembrarEjemplos(){
+  var h = new Date(), y = h.getFullYear(), m = h.getMonth();
+  function f(d){ return new Date(y, m, d).toISOString().slice(0,10); }
+  var dia = Math.max(3, Math.min(h.getDate(), 26));
+  S.viajes = [
+    { id:id(), ej:true, fecha:f(dia-2), origen:"Campo La Rinconada", destino:"Los Cisnes, Córdoba",
+      empresa:"Acopio del centro", kilos:29500, grano:"Soja", ctg:"", kms:120, tarifa:15200,
+      tarifaModo:"tonelada", pct:17 },
+    { id:id(), ej:true, fecha:f(dia), origen:"Campo El Ombú", destino:"Puerto San Martín, Santa Fe",
+      empresa:"Terminal", kilos:30000, grano:"Maíz", ctg:"", kms:310, tarifa:24800,
+      tarifaModo:"tonelada", pct:17 }
+  ];
+  S.cargas = [
+    { id:id(), ej:true, fecha:f(dia-3), km:412300, litros:210, lugar:"YPF Reducción" },
+    { id:id(), ej:true, fecha:f(dia-1), km:413050, litros:265, lugar:"Shell Ruta 8" }
+  ];
+  S.adelantos = [ { id:id(), ej:true, fecha:f(dia-2), monto:150000, nota:"Para el viaje" } ];
+}
+
+/* ============================================================
+   FORMATO
+   ============================================================ */
+var MESES = ["enero","febrero","marzo","abril","mayo","junio","julio","agosto","septiembre","octubre","noviembre","diciembre"];
+function nf(n, dec){
+  if(n===null || n===undefined || isNaN(n)) return "—";
+  return Number(n).toLocaleString("es-AR", {minimumFractionDigits:dec||0, maximumFractionDigits:dec||0});
+}
+function plata(n){ if(n===null||n===undefined||isNaN(n)) return "—"; return "$ " + nf(Math.round(n)); }
+function fechaCorta(iso){
+  if(!iso) return "";
+  var p = iso.split("-");
+  return p[2] + "/" + p[1];
+}
+function fechaLarga(iso){
+  if(!iso) return "";
+  var p = iso.split("-");
+  return p[2] + "/" + p[1] + "/" + p[0];
+}
+function hoyISO(){
+  var d = new Date();
+  return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0") + "-" + String(d.getDate()).padStart(2,"0");
+}
+function esc(s){
+  return String(s===null||s===undefined?"":s).replace(/[&<>"']/g, function(c){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+  });
+}
+function toast(txt){
+  var t = document.getElementById("toast");
+  t.textContent = txt; t.hidden = false;
+  clearTimeout(toast._t); toast._t = setTimeout(function(){ t.hidden = true; }, 2600);
+}
+
+/* ============================================================
+   CUENTAS
+   ============================================================ */
+function fleteDe(v){
+  if(v.fleteManual !== null && v.fleteManual !== undefined && v.fleteManual !== "") return Number(v.fleteManual);
+  var t = Number(v.tarifa) || 0;
+  var modo = v.tarifaModo || S.cfg.tarifaModo;
+  if(modo === "total") return t;
+  return t * ((Number(v.kilos)||0) / 1000);
+}
+function gananciaDe(v){
+  var pct = (v.pct === null || v.pct === undefined) ? S.cfg.pct : v.pct;
+  return fleteDe(v) * (Number(pct)/100);
+}
+function mesDe(iso){ return (iso||"").slice(0,7); }
+function delMes(arr, mes){ return arr.filter(function(x){ return mesDe(x.fecha) === mes; }); }
+
+/* Consumo: los litros que carga hoy son los que gastó desde la carga anterior.
+   consumo = (km de hoy - km de la carga anterior) / litros cargados hoy   */
+function cargasOrdenadas(){
+  return S.cargas.slice().sort(function(a,b){
+    var d = (a.fecha||"").localeCompare(b.fecha||"");
+    if(d !== 0) return d;
+    return (Number(a.km)||0) - (Number(b.km)||0);
+  });
+}
+function consumos(){
+  var cs = cargasOrdenadas(), out = [];
+  for(var i=0; i<cs.length; i++){
+    var c = cs[i], r = { c:c, km:null, kml:null };
+    if(i > 0){
+      var rec = (Number(c.km)||0) - (Number(cs[i-1].km)||0);
+      var lt = Number(c.litros)||0;
+      if(rec > 0 && lt > 0){ r.km = rec; r.kml = rec/lt; }
+    }
+    out.push(r);
+  }
+  return out;
+}
+function promedioGeneral(){
+  var cs = cargasOrdenadas();
+  if(cs.length < 2) return null;
+  var recorrido = (Number(cs[cs.length-1].km)||0) - (Number(cs[0].km)||0);
+  var litros = 0;
+  for(var i=1; i<cs.length; i++) litros += Number(cs[i].litros)||0;
+  if(recorrido <= 0 || litros <= 0) return null;
+  return recorrido / litros;
+}
+function kml100(kml){ return kml > 0 ? (100/kml) : null; }
+
+/* ============================================================
+   PANTALLAS
+   ============================================================ */
+var TABS = [
+  { k:"mes",       ic:"📊", t:"Mes" },
+  { k:"viajes",    ic:"🚛", t:"Viajes" },
+  { k:"gasoil",    ic:"⛽", t:"Gasoil" },
+  { k:"adelantos", ic:"💵", t:"Adelantos" },
+  { k:"ajustes",   ic:"⚙️", t:"Ajustes" }
+];
+var pantalla = "mes";
+var mesVista = hoyISO().slice(0,7);
+
+function nombreMes(m){
+  var p = m.split("-");
+  return MESES[Number(p[1])-1] + " " + p[0];
+}
+function pintarNav(){
+  document.getElementById("nav").innerHTML = TABS.map(function(t){
+    return '<button class="tab" data-tab="'+t.k+'" aria-current="'+(pantalla===t.k)+'">'+
+           '<span class="ic">'+t.ic+'</span>'+t.t+'</button>';
+  }).join("");
+}
+function avisoEjemplos(){
+  var hay = S.viajes.some(function(x){return x.ej;}) || S.cargas.some(function(x){return x.ej;}) || S.adelantos.some(function(x){return x.ej;});
+  if(!hay) return "";
+  return '<div class="aviso"><span>📝</span><div>Estos datos son de ejemplo, para que veas cómo queda. '+
+         '<button data-act="borrarEjemplos">Borrar los ejemplos</button></div></div>';
+}
+
+function vistaMes(){
+  var vs = delMes(S.viajes, mesVista);
+  var ad = delMes(S.adelantos, mesVista);
+  var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
+  var adelantado = ad.reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
+  var saldo = ganado - adelantado;
+  var kilos = vs.reduce(function(a,v){ return a + (Number(v.kilos)||0); }, 0);
+  var prom = promedioGeneral();
+
+  return avisoEjemplos() +
+  '<div class="mes">'+
+    '<button data-act="mesAnt" aria-label="Mes anterior">‹</button>'+
+    '<b>'+esc(nombreMes(mesVista))+'</b>'+
+    '<button data-act="mesSig" aria-label="Mes siguiente">›</button>'+
+  '</div>'+
+  '<div class="plata">'+
+    '<div class="tile"><div class="lab">Ganó en el mes · '+esc(S.cfg.pct)+'% del flete</div>'+
+      '<div class="val num">'+plata(ganado)+'</div>'+
+      '<div class="hint">'+vs.length+' viaje'+(vs.length===1?"":"s")+' · flete total '+plata(vs.reduce(function(a,v){return a+fleteDe(v);},0))+'</div></div>'+
+    '<div class="duo">'+
+      '<div class="tile"><div class="lab">Adelantos</div><div class="val num">'+plata(adelantado)+'</div>'+
+        '<div class="hint">'+ad.length+' adelanto'+(ad.length===1?"":"s")+'</div></div>'+
+      '<div class="tile saldo'+(saldo<0?" negativo":"")+'"><div class="lab">Le queda por cobrar</div>'+
+        '<div class="val num">'+plata(saldo)+'</div>'+
+        '<div class="hint">'+(saldo<0?"Cobró de más":"Ganado menos adelantos")+'</div></div>'+
+    '</div>'+
+  '</div>'+
+  '<div class="mini">'+
+    '<div><div class="lab">Kilos</div><div class="val num">'+nf(kilos)+'</div></div>'+
+    '<div><div class="lab">Toneladas</div><div class="val num">'+nf(kilos/1000,1)+'</div></div>'+
+    '<div><div class="lab">Consumo</div><div class="val num">'+(prom?nf(prom,2):"—")+'</div></div>'+
+  '</div>'+
+  '<div class="acciones">'+
+    '<button class="btn pri" data-act="nuevoPDF"><span class="ic">📄</span><span>Cargar carta de porte<small>Sube el PDF y se llena solo</small></span></button>'+
+    '<button class="btn chico" data-act="exportar"><span class="ic">📤</span><span>Pasar el mes a una planilla</span></button>'+
+  '</div>'+
+  '<div class="seccion">Viajes de '+esc(nombreMes(mesVista).split(" ")[0])+'</div>'+
+  (vs.length ? '<div class="lista">'+vs.slice().reverse().map(filaViaje).join("")+'</div>'
+             : '<div class="vacio">Todavía no hay viajes cargados en este mes.</div>');
+}
+
+function filaViaje(v){
+  return '<div class="fila">'+
+    '<div class="cab"><span class="fecha">'+esc(fechaCorta(v.fecha))+(v.ej?' <span class="tag">ejemplo</span>':'')+'</span>'+
+      '<span class="monto num">'+plata(gananciaDe(v))+'</span></div>'+
+    '<div class="ruta">'+esc(v.origen||"Sin origen")+'<span class="fl">→</span>'+esc(v.destino||"Sin destino")+'</div>'+
+    '<div class="det num">'+nf(v.kilos)+' kg'+(v.grano?' · '+esc(v.grano):'')+
+      (v.kms?' · '+nf(v.kms)+' km':'')+' · flete '+plata(fleteDe(v))+'</div>'+
+    '<div class="pie">'+
+      (v.qr ? '<button class="chip qr" data-act="verQR" data-id="'+v.id+'">▦ Ver QR</button>' : '')+
+      (v.ctg ? '<button class="chip" data-act="verCTG" data-id="'+v.id+'">CTG '+esc(v.ctg)+'</button>' : '')+
+      '<button class="chip" data-act="editarViaje" data-id="'+v.id+'">Editar</button>'+
+      '<button class="chip borrar" data-act="borrarViaje" data-id="'+v.id+'">Borrar</button>'+
+    '</div></div>';
+}
+
+function vistaViajes(){
+  var vs = S.viajes.slice().sort(function(a,b){ return (b.fecha||"").localeCompare(a.fecha||""); });
+  return avisoEjemplos() +
+  '<div class="acciones">'+
+    '<button class="btn pri" data-act="nuevoPDF"><span class="ic">📄</span><span>Cargar carta de porte<small>PDF o foto — saca todo solo</small></span></button>'+
+    '<button class="btn" data-act="dictarViaje"><span class="ic">🎤</span><span>Dictar el viaje<small>Hablale y él lo escribe</small></span></button>'+
+    '<button class="btn chico" data-act="editarViaje"><span class="ic">✏️</span><span>Cargar a mano</span></button>'+
+  '</div>'+
+  '<div class="seccion">Todos los viajes ('+vs.length+')</div>'+
+  (vs.length ? '<div class="lista">'+vs.map(filaViaje).join("")+'</div>'
+             : '<div class="vacio">Acá van a aparecer los viajes.<br>Empezá subiendo una carta de porte.</div>');
+}
+
+function vistaGasoil(){
+  var cs = consumos().reverse();
+  var prom = promedioGeneral();
+  var ult = null;
+  for(var i=0;i<cs.length;i++){ if(cs[i].kml){ ult = cs[i].kml; break; } }
+  return avisoEjemplos() +
+  '<div class="consumo"><div class="row">'+
+    '<div><div class="lab">Promedio del camión</div>'+
+      '<div class="val num">'+(prom?nf(prom,2):"—")+' <span>km por litro</span></div></div>'+
+    '<div class="alt">'+(prom?nf(kml100(prom),1)+' l cada 100 km':"Cargá dos veces<br>y sale el número")+
+      (ult?'<br>Última carga: '+nf(ult,2)+' km/l':'')+'</div>'+
+  '</div></div>'+
+  '<div class="acciones">'+
+    '<button class="btn pri" data-act="dictarGasoil"><span class="ic">🎤</span><span>Dictar la carga<small>"Cargué 250 litros, 413.500 kilómetros"</small></span></button>'+
+    '<button class="btn chico" data-act="editarCarga"><span class="ic">✏️</span><span>Cargar a mano</span></button>'+
+  '</div>'+
+  '<div class="seccion">Cargas de gasoil</div>'+
+  (cs.length ? '<div class="lista">'+cs.map(function(r){
+      var c = r.c;
+      return '<div class="fila"><div class="cab">'+
+        '<span class="fecha">'+esc(fechaCorta(c.fecha))+(c.ej?' <span class="tag">ejemplo</span>':'')+'</span>'+
+        '<span class="monto num">'+(r.kml?nf(r.kml,2)+' <span style="font-size:14px;font-weight:600">km/l</span>':'<span style="font-size:14px;color:var(--muted);font-weight:500">falta la anterior</span>')+'</span></div>'+
+        '<div class="ruta num">'+nf(c.litros)+' litros'+(c.lugar?' · '+esc(c.lugar):'')+'</div>'+
+        '<div class="det num">Tablero '+nf(c.km)+' km'+(r.km?' · hizo '+nf(r.km)+' km desde la carga anterior':'')+'</div>'+
+        '<div class="pie">'+
+          '<button class="chip" data-act="editarCarga" data-id="'+c.id+'">Editar</button>'+
+          '<button class="chip borrar" data-act="borrarCarga" data-id="'+c.id+'">Borrar</button>'+
+        '</div></div>';
+    }).join("")+'</div>'
+    : '<div class="vacio">Todavía no hay cargas de gasoil.</div>');
+}
+
+function vistaAdelantos(){
+  var ad = S.adelantos.slice().sort(function(a,b){ return (b.fecha||"").localeCompare(a.fecha||""); });
+  var mesAd = delMes(S.adelantos, mesVista).reduce(function(a,x){return a+(Number(x.monto)||0);},0);
+  var ganado = delMes(S.viajes, mesVista).reduce(function(a,v){ return a + gananciaDe(v); }, 0);
+  return avisoEjemplos() +
+  '<div class="plata"><div class="duo">'+
+    '<div class="tile"><div class="lab">Adelantos de '+esc(nombreMes(mesVista).split(" ")[0])+'</div>'+
+      '<div class="val num">'+plata(mesAd)+'</div></div>'+
+    '<div class="tile saldo'+((ganado-mesAd)<0?" negativo":"")+'"><div class="lab">Queda por cobrar</div>'+
+      '<div class="val num">'+plata(ganado-mesAd)+'</div></div>'+
+  '</div></div>'+
+  '<div class="acciones">'+
+    '<button class="btn pri" data-act="dictarAdelanto"><span class="ic">🎤</span><span>Dictar un adelanto<small>"Me dio cien mil pesos"</small></span></button>'+
+    '<button class="btn chico" data-act="editarAdelanto"><span class="ic">✏️</span><span>Cargar a mano</span></button>'+
+  '</div>'+
+  '<div class="seccion">Todos los adelantos</div>'+
+  (ad.length ? '<div class="lista">'+ad.map(function(x){
+      return '<div class="fila"><div class="cab">'+
+        '<span class="fecha">'+esc(fechaCorta(x.fecha))+(x.ej?' <span class="tag">ejemplo</span>':'')+'</span>'+
+        '<span class="monto num">'+plata(x.monto)+'</span></div>'+
+        (x.nota?'<div class="det">'+esc(x.nota)+'</div>':'')+
+        '<div class="pie">'+
+          '<button class="chip" data-act="editarAdelanto" data-id="'+x.id+'">Editar</button>'+
+          '<button class="chip borrar" data-act="borrarAdelanto" data-id="'+x.id+'">Borrar</button>'+
+        '</div></div>';
+    }).join("")+'</div>'
+    : '<div class="vacio">Todavía no hay adelantos cargados.</div>');
+}
+
+function vistaAjustes(){
+  return '<div class="seccion">Cómo se calcula la plata</div>'+
+  '<div class="campo"><label>Porcentaje que cobra del flete</label>'+
+    '<input type="number" inputmode="decimal" id="cfgPct" value="'+esc(S.cfg.pct)+'" step="0.5" min="0" max="100"></div>'+
+  '<div class="ajuste-nota">De cada flete, esta parte es de él. El resto es del patrón.</div>'+
+  '<div class="campo"><label>La tarifa de la carta de porte es…</label>'+
+    '<select id="cfgModo">'+
+      '<option value="tonelada"'+(S.cfg.tarifaModo==="tonelada"?" selected":"")+'>Por tonelada (se multiplica por los kilos)</option>'+
+      '<option value="total"'+(S.cfg.tarifaModo==="total"?" selected":"")+'>El importe total del viaje</option>'+
+    '</select></div>'+
+  '<div class="ajuste-nota">En la carta de porte de ARCA la tarifa suele ser <b>por tonelada</b>. '+
+    'Si los números del viaje no te cierran, probá cambiando esto.</div>'+
+  '<div class="acciones"><button class="btn pri chico" data-act="guardarCfg"><span class="ic">✓</span><span>Guardar los ajustes</span></button></div>'+
+  '<div class="seccion">Los datos</div>'+
+  '<div class="ajuste-nota">Todo se guarda en este celular. Si abrís la app en otro teléfono, ahí empieza vacía.</div>'+
+  '<div class="acciones">'+
+    '<button class="btn chico" data-act="exportar"><span class="ic">📤</span><span>Bajar todo como planilla</span></button>'+
+    '<button class="btn chico peligro" data-act="borrarTodo"><span class="ic">🗑️</span><span>Borrar todo y empezar de cero</span></button>'+
+  '</div>'+
+  '<div class="seccion">El dictado por voz</div>'+
+  '<div class="ajuste-nota">'+(hayVoz()
+      ? "El micrófono funciona en este teléfono. Necesita señal para escuchar."
+      : "Este navegador no tiene dictado por voz. En el celular, abrí la app con Chrome.")+'</div>';
+}
+
+function pintar(){
+  var v = document.getElementById("vista");
+  if(pantalla === "mes") v.innerHTML = vistaMes();
+  else if(pantalla === "viajes") v.innerHTML = vistaViajes();
+  else if(pantalla === "gasoil") v.innerHTML = vistaGasoil();
+  else if(pantalla === "adelantos") v.innerHTML = vistaAdelantos();
+  else v.innerHTML = vistaAjustes();
+  document.getElementById("subtitulo").textContent =
+    pantalla === "mes" ? "Viajes, gasoil y adelantos" :
+    pantalla === "viajes" ? "Cartas de porte y fletes" :
+    pantalla === "gasoil" ? "Cargas y consumo" :
+    pantalla === "adelantos" ? "Lo que le adelanta el patrón" : "Cómo trabaja la app";
+  pintarNav();
+}
+
+/* ============================================================
+   MODALES
+   ============================================================ */
+function abrir(html){
+  document.getElementById("modHoja").innerHTML = html;
+  document.getElementById("mod").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function cerrar(){
+  document.getElementById("mod").hidden = true;
+  document.body.style.overflow = "";
+  pararVoz();
+}
+function cerrarQR(){
+  document.getElementById("mQR").hidden = true;
+  document.body.style.overflow = "";
+}
+
+/* ---------- formulario de viaje ---------- */
+var borrador = null;
+function formViaje(v){
+  borrador = v || { id:id(), fecha:hoyISO(), tarifaModo:S.cfg.tarifaModo, pct:S.cfg.pct };
+  var b = borrador;
+  abrir(
+    '<h2>'+(v && v.origen ? "Revisá el viaje" : "Viaje nuevo")+'</h2>'+
+    '<div class="desc">'+(b.leido ? "Esto saqué de la carta de porte. Fijate que esté bien y guardá." : "Completá lo que sepas. Después lo podés corregir.")+'</div>'+
+    (b.leido ? '<div class="ok">✓ Carta de porte leída</div>' : '')+
+    '<div class="campo"><label>Fecha</label><input type="date" id="fViaje" value="'+esc(b.fecha||hoyISO())+'"></div>'+
+    '<div class="campo"><label>De dónde salió</label><input id="fOrigen" value="'+esc(b.origen||"")+'" placeholder="Campo Los Trece"></div>'+
+    '<div class="campo"><label>A dónde va</label><input id="fDestino" value="'+esc(b.destino||"")+'" placeholder="Puerto San Martín"></div>'+
+    '<div class="par">'+
+      '<div class="campo"><label>Kilos</label><input type="number" inputmode="numeric" id="fKilos" value="'+esc(b.kilos||"")+'" placeholder="30000"></div>'+
+      '<div class="campo"><label>Grano</label><input id="fGrano" value="'+esc(b.grano||"")+'" placeholder="Maíz"></div>'+
+    '</div>'+
+    '<div class="par">'+
+      '<div class="campo"><label>Tarifa</label><input type="number" inputmode="decimal" id="fTarifa" value="'+esc(b.tarifa||"")+'" placeholder="15200"></div>'+
+      '<div class="campo"><label>Kilómetros</label><input type="number" inputmode="numeric" id="fKms" value="'+esc(b.kms||"")+'" placeholder="50"></div>'+
+    '</div>'+
+    '<div class="campo"><label>La tarifa es</label><select id="fModo">'+
+      '<option value="tonelada"'+((b.tarifaModo||"tonelada")==="tonelada"?" selected":"")+'>Por tonelada</option>'+
+      '<option value="total"'+((b.tarifaModo)==="total"?" selected":"")+'>El total del viaje</option>'+
+    '</select></div>'+
+    '<div class="par">'+
+      '<div class="campo"><label>Su porcentaje</label><input type="number" inputmode="decimal" id="fPct" value="'+esc(b.pct===undefined?S.cfg.pct:b.pct)+'" step="0.5"></div>'+
+      '<div class="campo"><label>CTG</label><input id="fCtg" value="'+esc(b.ctg||"")+'" placeholder="10133935670"></div>'+
+    '</div>'+
+    '<div class="calc" id="calcViaje"></div>'+
+    '<div class="acciones">'+
+      '<button class="btn pri" data-act="guardarViaje"><span class="ic">✓</span><span>Guardar el viaje</span></button>'+
+      '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cancelar</span></button>'+
+    '</div>'
+  );
+  ["fKilos","fTarifa","fModo","fPct"].forEach(function(k){
+    document.getElementById(k).addEventListener("input", calcViaje);
+    document.getElementById(k).addEventListener("change", calcViaje);
+  });
+  calcViaje();
+}
+function leerFormViaje(){
+  function g(k){ var e = document.getElementById(k); return e ? e.value : ""; }
+  return {
+    fecha: g("fViaje") || hoyISO(),
+    origen: g("fOrigen").trim(),
+    destino: g("fDestino").trim(),
+    kilos: Number(g("fKilos")) || 0,
+    grano: g("fGrano").trim(),
+    tarifa: Number(g("fTarifa")) || 0,
+    kms: Number(g("fKms")) || 0,
+    tarifaModo: g("fModo"),
+    pct: Number(g("fPct")),
+    ctg: g("fCtg").trim()
+  };
+}
+function calcViaje(){
+  var d = leerFormViaje();
+  var fl = fleteDe(d), gan = fl * (d.pct/100);
+  document.getElementById("calcViaje").innerHTML =
+    '<div><span>Toneladas</span><b class="num">'+nf(d.kilos/1000,1)+'</b></div>'+
+    '<div><span>Flete del viaje</span><b class="num">'+plata(fl)+'</b></div>'+
+    '<div class="destaca"><span>Para él ('+nf(d.pct,1)+'%)</span><b class="num">'+plata(gan)+'</b></div>';
+}
+
+/* ---------- formulario de carga de gasoil ---------- */
+function formCarga(c){
+  borrador = c || { id:id(), fecha:hoyISO() };
+  var b = borrador;
+  var cs = cargasOrdenadas(), ant = null;
+  for(var i=0;i<cs.length;i++){ if(!b.id || cs[i].id !== b.id) ant = cs[i]; }
+  abrir(
+    '<h2>'+(c && c.km ? "Editar la carga" : "Carga de gasoil")+'</h2>'+
+    '<div class="desc">'+(ant ? "La última vez el tablero marcaba "+nf(ant.km)+" km." : "Esta es la primera carga: el consumo va a salir recién en la próxima.")+'</div>'+
+    '<div class="campo"><label>Fecha</label><input type="date" id="cFecha" value="'+esc(b.fecha||hoyISO())+'"></div>'+
+    '<div class="par">'+
+      '<div class="campo"><label>Kilómetros del tablero</label><input type="number" inputmode="numeric" id="cKm" value="'+esc(b.km||"")+'" placeholder="413500"></div>'+
+      '<div class="campo"><label>Litros cargados</label><input type="number" inputmode="decimal" id="cLitros" value="'+esc(b.litros||"")+'" placeholder="250"></div>'+
+    '</div>'+
+    '<div class="campo"><label>Dónde cargó (opcional)</label><input id="cLugar" value="'+esc(b.lugar||"")+'" placeholder="YPF Ruta 8"></div>'+
+    '<div class="calc" id="calcCarga"></div>'+
+    '<div class="acciones">'+
+      '<button class="btn pri" data-act="guardarCarga"><span class="ic">✓</span><span>Guardar la carga</span></button>'+
+      '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cancelar</span></button>'+
+    '</div>'
+  );
+  function calc(){
+    var km = Number(document.getElementById("cKm").value)||0;
+    var lt = Number(document.getElementById("cLitros").value)||0;
+    var box = document.getElementById("calcCarga");
+    if(ant && km > (Number(ant.km)||0) && lt > 0){
+      var rec = km - Number(ant.km), kml = rec/lt;
+      box.innerHTML = '<div><span>Recorrió desde la última carga</span><b class="num">'+nf(rec)+' km</b></div>'+
+        '<div class="destaca"><span>Consumo</span><b class="num">'+nf(kml,2)+' km/l</b></div>'+
+        '<div><span>O sea</span><b class="num">'+nf(kml100(kml),1)+' l/100 km</b></div>';
+    } else if(ant && km > 0 && km <= Number(ant.km)){
+      box.innerHTML = '<div><span style="color:var(--bad)">Los kilómetros tienen que ser más que '+nf(ant.km)+'</span></div>';
+    } else {
+      box.innerHTML = '<div><span>El consumo se calcula al guardar</span><b>—</b></div>';
+    }
+  }
+  document.getElementById("cKm").addEventListener("input", calc);
+  document.getElementById("cLitros").addEventListener("input", calc);
+  calc();
+}
+
+/* ---------- formulario de adelanto ---------- */
+function formAdelanto(a){
+  borrador = a || { id:id(), fecha:hoyISO() };
+  var b = borrador;
+  abrir(
+    '<h2>'+(a && a.monto ? "Editar el adelanto" : "Adelanto del patrón")+'</h2>'+
+    '<div class="desc">Es plata que le adelantan y después se la descuentan.</div>'+
+    '<div class="campo"><label>Fecha</label><input type="date" id="aFecha" value="'+esc(b.fecha||hoyISO())+'"></div>'+
+    '<div class="campo"><label>Cuánto le dio</label><input type="number" inputmode="decimal" id="aMonto" value="'+esc(b.monto||"")+'" placeholder="100000"></div>'+
+    '<div class="campo"><label>Nota (opcional)</label><input id="aNota" value="'+esc(b.nota||"")+'" placeholder="Para el viaje a Rosario"></div>'+
+    '<div class="acciones">'+
+      '<button class="btn pri" data-act="guardarAdelanto"><span class="ic">✓</span><span>Guardar el adelanto</span></button>'+
+      '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cancelar</span></button>'+
+    '</div>'
+  );
+}
+
+/* ============================================================
+   QR Y CTG
+   ============================================================ */
+function verQR(v){
+  var h = document.getElementById("qrHoja");
+  h.innerHTML =
+    '<h2>Carta de porte</h2>'+
+    '<p class="brillo">Subí el brillo del celular al máximo para que lo lean bien.</p>'+
+    (v.qr ? '<img src="'+v.qr+'" alt="Código QR de la carta de porte">'
+          : '<div class="vacio">Esta carta de porte no tiene QR guardado.</div>')+
+    (v.ctg ? '<div class="ctg-lab">CTG</div><div class="ctg-num num">'+esc(v.ctg)+'</div>' : '')+
+    '<div class="acciones" style="margin-top:16px">'+
+      (v.ctg ? '<button class="btn pri chico" data-act="copiarCTG" data-id="'+v.id+'"><span class="ic">⧉</span><span>Copiar el CTG</span></button>' : '')+
+      (v.qr && navigator.share ? '<button class="btn chico" data-act="compartirQR" data-id="'+v.id+'"><span class="ic">↗</span><span>Mandar el QR</span></button>' : '')+
+      '<button class="btn chico" data-act="cerrarQR"><span class="ic">✕</span><span>Cerrar</span></button>'+
+    '</div>';
+  document.getElementById("mQR").hidden = false;
+  document.body.style.overflow = "hidden";
+}
+function dataURLaBlob(u){
+  var p = u.split(","), bin = atob(p[1]), tipo = /:(.*?);/.exec(p[0])[1];
+  var a = new Uint8Array(bin.length);
+  for(var i=0;i<bin.length;i++) a[i] = bin.charCodeAt(i);
+  return new Blob([a], {type:tipo});
+}
+async function compartirQR(v){
+  try{
+    var blob = dataURLaBlob(v.qr);
+    var f = new File([blob], "carta-de-porte-"+(v.ctg||"qr")+".png", {type:"image/png"});
+    if(navigator.canShare && !navigator.canShare({files:[f]})){ toast("Este teléfono no deja compartir la imagen"); return; }
+    await navigator.share({ files:[f], title:"Carta de porte", text: v.ctg ? "CTG "+v.ctg : "" });
+  }catch(e){ if(e && e.name !== "AbortError") toast("No se pudo compartir"); }
+}
+async function copiar(txt){
+  try{ await navigator.clipboard.writeText(txt); toast("Copiado: "+txt); }
+  catch(e){ toast("No se pudo copiar. El número es "+txt); }
+}
+
+/* ============================================================
+   LEER LA CARTA DE PORTE  (PDF de ARCA o foto)
+   ============================================================ */
+function pedirArchivo(){
+  var inp = document.getElementById("archivo");
+  inp.value = "";
+  inp.onchange = function(){ if(inp.files && inp.files[0]) procesarArchivo(inp.files[0]); };
+  inp.click();
+}
+function pantallaCargando(txt){
+  abrir('<h2>Leyendo la carta de porte</h2>'+
+        '<div class="cargando"><div class="spin"></div><div id="pasoTxt">'+esc(txt)+'</div></div>'+
+        '<div class="acciones"><button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cancelar</span></button></div>');
+}
+function paso(t){ var e = document.getElementById("pasoTxt"); if(e) e.textContent = t; }
+
+async function procesarArchivo(file){
+  pantallaCargando("Abriendo el archivo…");
+  try{
+    var esPDF = file.type === "application/pdf" || /\.pdf$/i.test(file.name);
+    var datos = {}, qr = null, blobPagina = null;
+
+    if(esPDF){
+      paso("Leyendo el PDF…");
+      if(!window.pdfjsLib) throw new Error("sin-pdfjs");
+      pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+      var buf = await file.arrayBuffer();
+      var pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      var pag = await pdf.getPage(1);
+
+      var tc = await pag.getTextContent();
+      var texto = tc.items.map(function(i){ return i.str; }).join(" ").replace(/\s+/g," ").trim();
+      datos = leerCPE(texto);
+
+      paso("Buscando el código QR…");
+      var img = await pintarPagina(pag, 2200);
+      qr = recortarQR(img.canvas);
+      blobPagina = img.blob;
+    } else {
+      paso("Mirando la foto…");
+      var img2 = await pintarImagen(file, 2200);
+      qr = recortarQR(img2.canvas);
+      blobPagina = img2.blob;
+    }
+
+    if(!datos.ctg && !datos.kilos){
+      paso("No pude leerla sola, se la muestro a la inteligencia artificial…");
+      var conIA = await leerConIA(blobPagina);
+      if(conIA) datos = Object.assign(datos, conIA);
+    }
+
+    cerrar();
+    var v = Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo, leido:true }, datos);
+    if(qr) v.qr = qr;
+    formViaje(v);
+    if(!datos.ctg && !datos.kilos){
+      var h = document.getElementById("modHoja");
+      h.insertAdjacentHTML("afterbegin",
+        '<div class="error">No pude sacar los datos automáticamente. Completalos a mano — el QR sí quedó guardado si lo encontré.</div>');
+    }
+  }catch(e){
+    abrir('<h2>No pude leer el archivo</h2>'+
+      '<div class="error">'+esc(e && e.message === "sin-pdfjs" ? "No se pudo abrir el lector de PDF. Fijate que tengas señal y probá de nuevo." : "El archivo no se pudo abrir. Probá con el PDF original de ARCA, o cargá el viaje a mano.")+'</div>'+
+      '<div class="acciones">'+
+        '<button class="btn pri chico" data-act="editarViaje"><span class="ic">✏️</span><span>Cargar el viaje a mano</span></button>'+
+        '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cerrar</span></button>'+
+      '</div>');
+  }
+}
+
+async function pintarPagina(pag, anchoMax){
+  var vp1 = pag.getViewport({ scale: 1 });
+  var escala = Math.min(4, Math.max(2, anchoMax / vp1.width));
+  var vp = pag.getViewport({ scale: escala });
+  var cv = document.getElementById("lienzo");
+  cv.width = Math.round(vp.width); cv.height = Math.round(vp.height);
+  var cx = cv.getContext("2d");
+  cx.fillStyle = "#fff"; cx.fillRect(0,0,cv.width,cv.height);
+  await pag.render({ canvasContext: cx, viewport: vp }).promise;
+  var blob = await new Promise(function(r){ cv.toBlob(r, "image/jpeg", 0.75); });
+  return { canvas: cv, blob: blob };
+}
+async function pintarImagen(file, anchoMax){
+  var url = URL.createObjectURL(file);
+  try{
+    var im = await new Promise(function(res, rej){
+      var i = new Image(); i.onload = function(){ res(i); }; i.onerror = rej; i.src = url;
+    });
+    var esc2 = Math.min(1, anchoMax / im.naturalWidth);
+    var cv = document.getElementById("lienzo");
+    cv.width = Math.round(im.naturalWidth * esc2); cv.height = Math.round(im.naturalHeight * esc2);
+    var cx = cv.getContext("2d");
+    cx.drawImage(im, 0, 0, cv.width, cv.height);
+    var blob = await new Promise(function(r){ cv.toBlob(r, "image/jpeg", 0.75); });
+    return { canvas: cv, blob: blob };
+  } finally { URL.revokeObjectURL(url); }
+}
+
+function recortarQR(cv){
+  try{
+    var cx = cv.getContext("2d");
+    var d = cx.getImageData(0, 0, cv.width, cv.height);
+    var r = jsQR(d.data, cv.width, cv.height, { inversionAttempts: "attemptBoth" });
+    if(!r || !r.location) return null;
+    var pts = [r.location.topLeftCorner, r.location.topRightCorner, r.location.bottomLeftCorner, r.location.bottomRightCorner];
+    var xs = pts.map(function(p){ return p.x; }), ys = pts.map(function(p){ return p.y; });
+    var x0 = Math.min.apply(null, xs), x1 = Math.max.apply(null, xs);
+    var y0 = Math.min.apply(null, ys), y1 = Math.max.apply(null, ys);
+    var pad = Math.max(14, (x1-x0) * 0.12);
+    x0 = Math.max(0, x0-pad); y0 = Math.max(0, y0-pad);
+    x1 = Math.min(cv.width, x1+pad); y1 = Math.min(cv.height, y1+pad);
+    var w = Math.round(x1-x0), h = Math.round(y1-y0);
+    if(w < 20 || h < 20) return null;
+    var out = document.createElement("canvas");
+    var lado = Math.min(720, Math.max(w, h) * 2);
+    out.width = lado; out.height = lado;
+    var ox = out.getContext("2d");
+    ox.imageSmoothingEnabled = false;
+    ox.fillStyle = "#fff"; ox.fillRect(0,0,lado,lado);
+    ox.drawImage(cv, Math.round(x0), Math.round(y0), w, h, 0, 0, lado, lado);
+    return out.toDataURL("image/png");
+  }catch(e){ return null; }
+}
+
+/* --- lectura del texto de la Carta de Porte Electrónica de ARCA --- */
+function seccion(t, desde, hasta){
+  var i = t.search(desde);
+  if(i < 0) return "";
+  var resto = t.slice(i);
+  if(hasta){ var j = resto.search(hasta); if(j > 0) return resto.slice(0, j); }
+  return resto;
+}
+function limpiar(s){
+  return (s||"").replace(/\s+/g," ").replace(/^[\s:-]+|[\s:-]+$/g,"").trim();
+}
+function numeroDe(s){
+  if(!s) return 0;
+  var t = String(s).replace(/\./g,"").replace(",", ".").replace(/[^\d.]/g,"");
+  var n = parseFloat(t);
+  return isNaN(n) ? 0 : n;
+}
+function leerCPE(t){
+  var d = {};
+  var mCtg = /CTG\s*:?\s*(\d{8,15})/i.exec(t);
+  if(mCtg) d.ctg = mCtg[1];
+  var mF = /Fecha\s*:?\s*(\d{2})\/(\d{2})\/(\d{4})/i.exec(t);
+  if(mF) d.fecha = mF[3] + "-" + mF[2] + "-" + mF[1];
+
+  var B = seccion(t, /B\s*-\s*GRANO/i, /C\s*-\s*PROCEDENCIA/i);
+  var C = seccion(t, /C\s*-\s*PROCEDENCIA/i, /D\s*-\s*DESTINO/i);
+  var D = seccion(t, /D\s*-\s*DESTINO/i, /E\s*-\s*DATOS/i);
+  var E = seccion(t, /E\s*-\s*DATOS/i, /F\s*-\s*CONTINGENCIAS/i);
+  var A = seccion(t, /A\s*-\s*INTERVINIENTES/i, /B\s*-\s*GRANO/i);
+
+  var mNeto = /Peso\s*Neto\s*:?\s*([\d.,]+)/i.exec(B || t);
+  if(mNeto) d.kilos = numeroDe(mNeto[1]);
+  var mTipo = /Tipo\s*:?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ ]{3,25}?)\s*(?:Campaña|Peso|DECLARA)/i.exec(B);
+  if(mTipo) d.grano = limpiar(mTipo[1]);
+  else { var mGr = /Grano\s*\/?\s*:?\s*([A-Za-zÁÉÍÓÚÜÑáéíóúüñ]{3,20})/i.exec(B); if(mGr) d.grano = limpiar(mGr[1]); }
+
+  var mObs = /Observaciones\s*:?\s*([^]{2,90}?)(?:\s*C\s*-\s*PROCEDENCIA|$)/i.exec(B);
+  var obs = mObs ? limpiar(mObs[1]) : "";
+  var mLocC = /Localidad\s*:?\s*([^]{2,40}?)\s*(?:Provincia|Descripción|$)/i.exec(C);
+  var locC = mLocC ? limpiar(mLocC[1]) : "";
+  if(/campo/i.test(obs)) d.origen = obs.replace(/\s+COSECHA.*$/i, "");
+  else if(locC) d.origen = locC;
+  if(locC && d.origen && d.origen !== locC) d.origenLocalidad = locC;
+
+  var mLocD = /Localidad\s*:?\s*([^]{2,40}?)\s*(?:Provincia|$)/i.exec(D);
+  var mProvD = /Provincia\s*:?\s*([A-ZÁÉÍÓÚÑ ]{3,30}?)(?:\s{2,}|\s*E\s*-|$)/i.exec(D);
+  var mDest = /Destinatario\s*:?\s*(?:\d{11}\s*-\s*)?([^]{3,60}?)\s*(?:Destino\s*:|Empresa)/i.exec(A);
+  var partes = [];
+  if(mLocD) partes.push(limpiar(mLocD[1]));
+  if(mProvD) partes.push(limpiar(mProvD[1]));
+  if(partes.length) d.destino = partes.join(", ");
+  if(mDest) d.empresa = limpiar(mDest[1]).replace(/\s*(SOCIEDAD ANONIMA|S\.?A\.?)\b.*$/i, "");
+
+  var mKms = /Kms?\.?\s*a\s*recorrer\s*:?\s*([\d.,]+)/i.exec(E || t);
+  if(mKms) d.kms = numeroDe(mKms[1]);
+  var mTar = /Tarifa\s*:?\s*([\d.,]+)/i.exec(E || t);
+  if(mTar) d.tarifa = numeroDe(mTar[1]);
+  var mCpe = /N[°ºo]?\s*CPE\s*:?\s*([\d-]{5,20})/i.exec(t);
+  if(mCpe) d.cpe = mCpe[1];
+  return d;
+}
+
+/* --- si no se pudo leer sola: se la mostramos a Claude --- */
+var IA = null, IAlista = false;
+async function prepararIA(){
+  if(IAlista) return IA;
+  IAlista = true;
+  try{ IA = await window.claude.use("sample"); }catch(e){ IA = null; }
+  return IA;
+}
+async function leerConIA(blob){
+  var s = await prepararIA();
+  if(!s || !blob) return null;
+  try{
+    var lim = await s.limits().catch(function(){ return null; });
+    if(!lim || !lim.images) return null;
+    var r = await s.json(
+      "En la imagen hay una Carta de Porte Electrónica Automotor de ARCA (Argentina). " +
+      "Leela y devolvé SOLO un objeto JSON con estas claves, usando null donde no encuentres el dato:\n" +
+      '{"ctg": string, "fecha": "AAAA-MM-DD", "origen": string, "destino": string, "empresa": string, ' +
+      '"grano": string, "kilos": number, "kms": number, "tarifa": number}\n' +
+      "kilos = el Peso Neto de la sección B, en kilos, solo el número. " +
+      "origen = si en Observaciones aparece un nombre de campo usá ese; si no, la Localidad de la sección C PROCEDENCIA. " +
+      "destino = Localidad y Provincia de la sección D. " +
+      "kms = 'Kms. a recorrer'. tarifa = el campo Tarifa de la sección E, solo el número.",
+      { images: blob, modelTier: "default" }
+    );
+    if(!r || typeof r !== "object") return null;
+    var d = {};
+    ["ctg","fecha","origen","destino","empresa","grano"].forEach(function(k){ if(r[k]) d[k] = String(r[k]); });
+    ["kilos","kms","tarifa"].forEach(function(k){ if(r[k]) d[k] = Number(r[k]) || 0; });
+    return d;
+  }catch(e){ return null; }
+}
+
+/* ============================================================
+   DICTADO POR VOZ
+   ============================================================ */
+function hayVoz(){ return !!(window.SpeechRecognition || window.webkitSpeechRecognition); }
+var rec = null;
+function pararVoz(){ try{ if(rec){ rec.onend = null; rec.stop(); rec = null; } }catch(e){} }
+
+var EJEMPLOS = {
+  viaje: '<b>"Salí del campo Los Trece para el puerto de Rosario con treinta mil kilos de soja"</b>',
+  gasoil: '<b>"Cargué doscientos cincuenta litros, el tablero marca cuatrocientos trece mil quinientos"</b>',
+  adelanto: '<b>"El patrón me dio cien mil pesos"</b>'
+};
+function dictar(tipo){
+  if(!hayVoz()){
+    toast("Este navegador no tiene dictado. Cargalo a mano.");
+    if(tipo === "viaje") formViaje(); else if(tipo === "gasoil") formCarga(); else formAdelanto();
+    return;
+  }
+  var titulo = tipo === "viaje" ? "Contame el viaje" : tipo === "gasoil" ? "Contame la carga" : "Contame el adelanto";
+  abrir(
+    '<h2>'+titulo+'</h2>'+
+    '<div class="desc">Tocá el micrófono y hablá tranquilo. Después revisás lo que entendió.</div>'+
+    '<div class="dic">'+
+      '<button class="micro" id="btnMic" aria-label="Empezar a hablar">🎤</button>'+
+      '<div class="escuchado gris" id="txtVoz">Tocá el micrófono para empezar…</div>'+
+      '<div class="ejemplos">Por ejemplo:<br>'+EJEMPLOS[tipo]+'</div>'+
+    '</div>'+
+    '<div class="acciones">'+
+      '<button class="btn pri" data-act="usarDictado" data-tipo="'+tipo+'"><span class="ic">✓</span><span>Listo, pasalo a la planilla</span></button>'+
+      '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cancelar</span></button>'+
+    '</div>'
+  );
+  var btn = document.getElementById("btnMic"), caja = document.getElementById("txtVoz");
+  var textoFinal = "";
+  function arrancar(){
+    var R = window.SpeechRecognition || window.webkitSpeechRecognition;
+    rec = new R();
+    rec.lang = "es-AR"; rec.continuous = true; rec.interimResults = true;
+    rec.onresult = function(ev){
+      var interino = "";
+      for(var i = ev.resultIndex; i < ev.results.length; i++){
+        if(ev.results[i].isFinal) textoFinal += ev.results[i][0].transcript + " ";
+        else interino += ev.results[i][0].transcript;
+      }
+      caja.classList.remove("gris");
+      caja.textContent = (textoFinal + interino).trim() || "Escuchando…";
+    };
+    rec.onerror = function(ev){
+      btn.classList.remove("on");
+      caja.classList.add("gris");
+      caja.textContent = ev.error === "not-allowed"
+        ? "No me dejaron usar el micrófono. Habilitalo en el candado de la barra de direcciones."
+        : ev.error === "no-speech" ? "No escuché nada. Probá de nuevo." : "Se cortó el micrófono. Tocalo otra vez.";
+    };
+    rec.onend = function(){ btn.classList.remove("on"); rec = null; };
+    try{ rec.start(); btn.classList.add("on"); caja.classList.remove("gris"); caja.textContent = "Escuchando…"; }
+    catch(e){}
+  }
+  btn.onclick = function(){
+    if(rec){ pararVoz(); btn.classList.remove("on"); }
+    else arrancar();
+  };
+  arrancar();
+  dictar._texto = function(){ return textoFinal.trim() || (caja.classList.contains("gris") ? "" : caja.textContent.trim()); };
+}
+
+/* --- números dichos en palabras --> números --- */
+var UNI = {cero:0,un:1,uno:1,una:1,dos:2,tres:3,cuatro:4,cinco:5,seis:6,siete:7,ocho:8,nueve:9,diez:10,once:11,doce:12,trece:13,catorce:14,quince:15,dieciseis:16,dieciséis:16,diecisiete:17,dieciocho:18,diecinueve:19,veinte:20,veintiuno:21,veintiun:21,veintidos:22,veintidós:22,veintitres:23,veintitrés:23,veinticuatro:24,veinticinco:25,veintiseis:26,veintiséis:26,veintisiete:27,veintiocho:28,veintinueve:29,treinta:30,cuarenta:40,cincuenta:50,sesenta:60,setenta:70,ochenta:80,noventa:90,cien:100,ciento:100,doscientos:200,trescientos:300,cuatrocientos:400,quinientos:500,seiscientos:600,setecientos:700,ochocientos:800,novecientos:900};
+function palabrasANumeros(txt){
+  var pal = txt.toLowerCase().replace(/[.,](?=\s|$)/g," ").split(/\s+/);
+  var out = [], acum = 0, parcial = 0, activo = false;
+  function volcar(){
+    if(activo){ out.push(String(acum + parcial)); acum = 0; parcial = 0; activo = false; }
+  }
+  for(var i=0;i<pal.length;i++){
+    var p = pal[i].replace(/[^a-záéíóúüñ0-9]/g,"");
+    if(p === "y" && activo){ continue; }
+    if(UNI[p] !== undefined){ parcial += UNI[p]; activo = true; continue; }
+    if(p === "mil"){ parcial = (parcial || 1) * 1000; acum += parcial; parcial = 0; activo = true; continue; }
+    if(p === "millon" || p === "millón" || p === "millones"){ parcial = (parcial || 1) * 1000000; acum += parcial; parcial = 0; activo = true; continue; }
+    if(/^\d+$/.test(p)){ volcar(); out.push(p); continue; }
+    volcar();
+    out.push(pal[i]);
+  }
+  volcar();
+  return out.join(" ");
+}
+function buscarNum(txt, re){
+  var m = re.exec(txt);
+  if(!m) return null;
+  var n = numeroDe(m[1]);
+  return n > 0 ? n : null;
+}
+function entenderLocal(tipo, txt){
+  var t = palabrasANumeros(" " + txt.toLowerCase() + " ").replace(/\s+/g," ");
+  var d = {};
+  if(tipo === "gasoil"){
+    d.litros = buscarNum(t, /([\d.]+)\s*(?:litros?|lts?|l)\b/);
+    d.km = buscarNum(t, /(?:tablero|kilometraje|kil[óo]metros?|kms?)\D{0,12}?([\d.]{4,})/) ||
+           buscarNum(t, /([\d.]{5,})\s*(?:kil[óo]metros?|kms?)\b/);
+  } else if(tipo === "adelanto"){
+    d.monto = buscarNum(t, /([\d.]+)\s*(?:pesos|mangos|lucas)?/);
+    if(/lucas?/.test(t) && d.monto && d.monto < 10000) d.monto = d.monto * 1000;
+  } else {
+    d.kilos = buscarNum(t, /([\d.]+)\s*(?:kilos?|kg)\b/);
+    var tn = buscarNum(t, /([\d.]+)\s*(?:toneladas?|tn)\b/);
+    if(!d.kilos && tn) d.kilos = tn * 1000;
+    var mo = /(?:sal[ií]|desde|del?)\s+(?:el\s+)?(campo\s+[a-záéíóúñ0-9 ]{2,28}?)(?=\s+(?:para|hacia|al|a|con|y|rumbo)\b|$)/.exec(t);
+    if(mo) d.origen = titulo(mo[1]);
+    var md = /(?:para|hacia|rumbo a|con destino a|voy a|al?)\s+((?:el\s+|la\s+)?(?:puerto|planta|acopio|terminal)?[a-záéíóúñ0-9 ]{3,32}?)(?=\s+(?:con|de|y|llevando)\b|$)/.exec(t);
+    if(md) d.destino = titulo(md[1]);
+    var mg = /\b(soja|ma[íi]z|trigo|girasol|sorgo|cebada|man[íi]|avena|centeno)\b/.exec(t);
+    if(mg) d.grano = titulo(mg[1]);
+  }
+  Object.keys(d).forEach(function(k){ if(!d[k]) delete d[k]; });
+  return d;
+}
+function titulo(s){
+  return s.trim().replace(/\s+/g," ").replace(/(^|\s)([a-záéíóúñ])/g, function(m,a,b){ return a + b.toUpperCase(); });
+}
+async function entenderConIA(tipo, txt){
+  var s = await prepararIA();
+  if(!s) return null;
+  var pide = tipo === "gasoil"
+    ? '{"litros": number, "km": number, "lugar": string}  (km = los kilómetros del tablero del camión)'
+    : tipo === "adelanto"
+    ? '{"monto": number, "nota": string}  (monto en pesos argentinos)'
+    : '{"origen": string, "destino": string, "kilos": number, "grano": string}  (kilos siempre en kilos: "treinta mil kilos" = 30000; si dice toneladas multiplicá por 1000)';
+  try{
+    var r = await s.json(
+      "Un camionero argentino dictó esto mientras trabajaba:\n\"" + txt + "\"\n\n" +
+      "Devolvé SOLO un objeto JSON con estas claves, con null en lo que no haya dicho:\n" + pide + "\n" +
+      "No inventes datos que no dijo. Los números sin puntos ni comas.",
+      { modelTier: "quick" }
+    );
+    return (r && typeof r === "object") ? r : null;
+  }catch(e){ return null; }
+}
+async function usarDictado(tipo){
+  var txt = dictar._texto ? dictar._texto() : "";
+  pararVoz();
+  if(!txt){ toast("No escuché nada todavía"); return; }
+  var d = entenderLocal(tipo, txt);
+  var faltan = tipo === "gasoil" ? (!d.litros || !d.km)
+             : tipo === "adelanto" ? !d.monto
+             : (!d.kilos || !d.origen || !d.destino);
+  if(faltan){
+    paso && null;
+    var hoja = document.getElementById("modHoja");
+    if(hoja) hoja.insertAdjacentHTML("afterbegin", '<div class="cargando" id="pensando"><div class="spin"></div><div>Entendiendo lo que dijiste…</div></div>');
+    var mejor = await entenderConIA(tipo, txt);
+    var p = document.getElementById("pensando"); if(p) p.remove();
+    if(mejor){
+      Object.keys(mejor).forEach(function(k){
+        if(mejor[k] !== null && mejor[k] !== undefined && mejor[k] !== "" && !d[k]) d[k] = mejor[k];
+      });
+    }
+  }
+  if(tipo === "gasoil") formCarga(Object.assign({ id:id(), fecha:hoyISO() }, d));
+  else if(tipo === "adelanto") formAdelanto(Object.assign({ id:id(), fecha:hoyISO(), nota:d.nota || "" }, d));
+  else formViaje(Object.assign({ id:id(), fecha:hoyISO(), pct:S.cfg.pct, tarifaModo:S.cfg.tarifaModo }, d));
+}
+
+/* ============================================================
+   EXPORTAR
+   ============================================================ */
+async function exportar(){
+  var lineas = [];
+  lineas.push("CUIDAME EL CAMION - " + nombreMes(mesVista).toUpperCase());
+  lineas.push("");
+  lineas.push("VIAJES");
+  lineas.push("Fecha;Origen;Destino;Grano;Kilos;Km;Tarifa;Flete;Porcentaje;Le corresponde;CTG");
+  var vs = delMes(S.viajes, mesVista);
+  vs.forEach(function(v){
+    lineas.push([fechaLarga(v.fecha), v.origen||"", v.destino||"", v.grano||"", v.kilos||0, v.kms||0,
+      v.tarifa||0, Math.round(fleteDe(v)), (v.pct===undefined?S.cfg.pct:v.pct)+"%", Math.round(gananciaDe(v)), v.ctg||""]
+      .map(function(c){ return String(c).replace(/;/g, ","); }).join(";"));
+  });
+  lineas.push("");
+  lineas.push("GASOIL");
+  lineas.push("Fecha;Kilometros tablero;Litros;Lugar;Consumo km/l");
+  consumos().filter(function(r){ return mesDe(r.c.fecha) === mesVista; }).forEach(function(r){
+    lineas.push([fechaLarga(r.c.fecha), r.c.km||0, r.c.litros||0, (r.c.lugar||"").replace(/;/g,","),
+      r.kml ? r.kml.toFixed(2).replace(".", ",") : ""].join(";"));
+  });
+  lineas.push("");
+  lineas.push("ADELANTOS");
+  lineas.push("Fecha;Monto;Nota");
+  delMes(S.adelantos, mesVista).forEach(function(a){
+    lineas.push([fechaLarga(a.fecha), a.monto||0, (a.nota||"").replace(/;/g,",")].join(";"));
+  });
+  var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
+  var adel = delMes(S.adelantos, mesVista).reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
+  lineas.push("");
+  lineas.push("RESUMEN");
+  lineas.push("Ganado en el mes;" + Math.round(ganado));
+  lineas.push("Adelantos;" + Math.round(adel));
+  lineas.push("Queda por cobrar;" + Math.round(ganado - adel));
+
+  var csv = "﻿" + lineas.join("\r\n");
+  var nombre = "cuaderno-" + mesVista + ".csv";
+  try{
+    var dl = await window.claude.use("downloads");
+    if(dl){ await dl.save({ filename: nombre, data: csv }); toast("Planilla lista"); return; }
+  }catch(e){}
+  abrir('<h2>El resumen del mes</h2>'+
+    '<div class="desc">Copialo y pegalo donde lo necesites.</div>'+
+    '<div class="campo"><textarea rows="12" id="csvTxt" style="font-size:13px">'+esc(csv.replace("﻿",""))+'</textarea></div>'+
+    '<div class="acciones">'+
+      '<button class="btn pri chico" data-act="copiarCSV"><span class="ic">⧉</span><span>Copiar todo</span></button>'+
+      '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cerrar</span></button>'+
+    '</div>');
+}
+
+/* ============================================================
+   ACCIONES
+   ============================================================ */
+function buscar(arr, i){ for(var k=0;k<arr.length;k++){ if(arr[k].id === i) return arr[k]; } return null; }
+function quitar(arr, i){ for(var k=0;k<arr.length;k++){ if(arr[k].id === i){ arr.splice(k,1); return true; } } return false; }
+function mover(delta){
+  var p = mesVista.split("-"), d = new Date(Number(p[0]), Number(p[1]) - 1 + delta, 1);
+  mesVista = d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
+  pintar();
+}
+
+var ACC = {
+  mesAnt: function(){ mover(-1); },
+  mesSig: function(){ mover(1); },
+  cerrar: cerrar,
+  cerrarQR: cerrarQR,
+  nuevoPDF: pedirArchivo,
+  dictarViaje: function(){ dictar("viaje"); },
+  dictarGasoil: function(){ dictar("gasoil"); },
+  dictarAdelanto: function(){ dictar("adelanto"); },
+  usarDictado: function(el){ usarDictado(el.getAttribute("data-tipo")); },
+  exportar: exportar,
+  copiarCSV: function(){ copiar(document.getElementById("csvTxt").value); },
+
+  editarViaje: function(el){ var i = el.getAttribute("data-id"); formViaje(i ? Object.assign({}, buscar(S.viajes, i)) : null); },
+  editarCarga: function(el){ var i = el.getAttribute("data-id"); formCarga(i ? Object.assign({}, buscar(S.cargas, i)) : null); },
+  editarAdelanto: function(el){ var i = el.getAttribute("data-id"); formAdelanto(i ? Object.assign({}, buscar(S.adelantos, i)) : null); },
+
+  guardarViaje: function(){
+    var d = leerFormViaje();
+    if(!d.kilos && !d.origen && !d.destino){ toast("Poné al menos de dónde salió"); return; }
+    var v = Object.assign({}, borrador, d);
+    delete v.ej; delete v.leido;
+    quitar(S.viajes, v.id);
+    S.viajes.push(v);
+    guardar(); cerrar(); pintar(); toast("Viaje guardado");
+  },
+  guardarCarga: function(){
+    var c = Object.assign({}, borrador, {
+      fecha: document.getElementById("cFecha").value || hoyISO(),
+      km: Number(document.getElementById("cKm").value) || 0,
+      litros: Number(document.getElementById("cLitros").value) || 0,
+      lugar: document.getElementById("cLugar").value.trim()
+    });
+    if(!c.km || !c.litros){ toast("Faltan los kilómetros o los litros"); return; }
+    delete c.ej;
+    quitar(S.cargas, c.id);
+    S.cargas.push(c);
+    guardar(); cerrar(); pintar(); toast("Carga guardada");
+  },
+  guardarAdelanto: function(){
+    var a = Object.assign({}, borrador, {
+      fecha: document.getElementById("aFecha").value || hoyISO(),
+      monto: Number(document.getElementById("aMonto").value) || 0,
+      nota: document.getElementById("aNota").value.trim()
+    });
+    if(!a.monto){ toast("Falta cuánto le dio"); return; }
+    delete a.ej;
+    quitar(S.adelantos, a.id);
+    S.adelantos.push(a);
+    guardar(); cerrar(); pintar(); toast("Adelanto guardado");
+  },
+
+  borrarViaje: function(el){ if(confirm("¿Borrar este viaje?")){ quitar(S.viajes, el.getAttribute("data-id")); guardar(); pintar(); } },
+  borrarCarga: function(el){ if(confirm("¿Borrar esta carga de gasoil?")){ quitar(S.cargas, el.getAttribute("data-id")); guardar(); pintar(); } },
+  borrarAdelanto: function(el){ if(confirm("¿Borrar este adelanto?")){ quitar(S.adelantos, el.getAttribute("data-id")); guardar(); pintar(); } },
+  borrarEjemplos: function(){
+    S.viajes = S.viajes.filter(function(x){ return !x.ej; });
+    S.cargas = S.cargas.filter(function(x){ return !x.ej; });
+    S.adelantos = S.adelantos.filter(function(x){ return !x.ej; });
+    S.cfg.ejemplos = false;
+    guardar(); pintar(); toast("Listo, quedó limpio");
+  },
+  borrarTodo: function(){
+    if(!confirm("Esto borra todos los viajes, cargas y adelantos de este celular. ¿Seguro?")) return;
+    S.viajes = []; S.cargas = []; S.adelantos = []; S.cfg.ejemplos = false;
+    guardar(); pintar(); toast("Todo borrado");
+  },
+  guardarCfg: function(){
+    var p = Number(document.getElementById("cfgPct").value);
+    if(p > 0 && p <= 100) S.cfg.pct = p;
+    S.cfg.tarifaModo = document.getElementById("cfgModo").value;
+    guardar(); pintar(); toast("Ajustes guardados");
+  },
+
+  verQR: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) verQR(v); },
+  verCTG: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) verQR(v); },
+  copiarCTG: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) copiar(v.ctg); },
+  compartirQR: function(el){ var v = buscar(S.viajes, el.getAttribute("data-id")); if(v) compartirQR(v); }
+};
+
+document.addEventListener("click", function(ev){
+  var t = ev.target.closest("[data-act]");
+  if(t){ var f = ACC[t.getAttribute("data-act")]; if(f){ ev.preventDefault(); f(t); } return; }
+  var tab = ev.target.closest("[data-tab]");
+  if(tab){ pantalla = tab.getAttribute("data-tab"); pintar(); window.scrollTo(0,0); return; }
+  if(ev.target.id === "mod") cerrar();
+  if(ev.target.id === "mQR") cerrarQR();
+});
+document.addEventListener("keydown", function(ev){
+  if(ev.key === "Escape"){ cerrar(); cerrarQR(); }
+});
+
+/* ============================================================
+   ARRANQUE
+   ============================================================ */
+if(!cargar()){ sembrarEjemplos(); guardar(); }
+pintar();
+prepararIA();
+
+})();
+</script>
