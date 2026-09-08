@@ -22,6 +22,7 @@
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.mini.min.js"></script>
 <style>
 :root{
   --bg:#E9ECE5; --surface:#FFFFFF; --surface2:#F3F5EF; --raised:#FFFFFF;
@@ -1549,48 +1550,96 @@ async function usarDictado(tipo){
 /* ============================================================
    EXPORTAR
    ============================================================ */
+function hojaDe(filas, anchos){
+  var ws = XLSX.utils.aoa_to_sheet(filas);
+  if(anchos) ws["!cols"] = anchos.map(function(w){ return { wch: w }; });
+  return ws;
+}
 async function exportar(){
+  if(!window.XLSX){ exportarComoTexto(); return; }
+
+  var vs = delMes(S.viajes, mesVista);
+  var cargasMes = consumos().filter(function(r){ return mesDe(r.c.fecha) === mesVista; });
+  var adelantosMes = delMes(S.adelantos, mesVista);
+  var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
+  var adel = adelantosMes.reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
+
+  var filasViajes = [["Fecha","Origen","Destino","Grano","Kilos","Km","Tarifa","Flete","Porcentaje","Le corresponde","CTG"]];
+  vs.forEach(function(v){
+    filasViajes.push([fechaLarga(v.fecha), v.origen||"", v.destino||"", v.grano||"",
+      Number(v.kilos)||0, Number(v.kms)||0, Number(v.tarifa)||0, Math.round(fleteDe(v)),
+      (v.pct===undefined?S.cfg.pct:v.pct)/100, Math.round(gananciaDe(v)), v.ctg||""]);
+  });
+
+  var filasGasoil = [["Fecha","Kilómetros tablero","Litros","Lugar","Consumo km/l"]];
+  cargasMes.forEach(function(r){
+    filasGasoil.push([fechaLarga(r.c.fecha), Number(r.c.km)||0, Number(r.c.litros)||0,
+      r.c.lugar||"", r.kml ? Number(r.kml.toFixed(2)) : ""]);
+  });
+
+  var filasAdelantos = [["Fecha","Monto","Nota"]];
+  adelantosMes.forEach(function(a){
+    filasAdelantos.push([fechaLarga(a.fecha), Number(a.monto)||0, a.nota||""]);
+  });
+
+  var filasResumen = [
+    ["Cuídame el Camión", nombreMes(mesVista)],
+    [],
+    ["Viajes", vs.length],
+    ["Ganado en el mes", Math.round(ganado)],
+    ["Adelantos", Math.round(adel)],
+    ["Le queda por cobrar", Math.round(ganado - adel)]
+  ];
+
+  var wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, hojaDe(filasResumen, [22,16]), "Resumen");
+  XLSX.utils.book_append_sheet(wb, hojaDe(filasViajes, [11,20,20,10,9,7,10,12,10,14,14]), "Viajes");
+  XLSX.utils.book_append_sheet(wb, hojaDe(filasGasoil, [11,17,8,20,13]), "Gasoil");
+  XLSX.utils.book_append_sheet(wb, hojaDe(filasAdelantos, [11,12,26]), "Adelantos");
+
+  var buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
+  var blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  var nombre = "cuidame-el-camion-" + mesVista + ".xlsx";
+
+  try{
+    var dl = await window.claude.use("downloads");
+    if(dl){ await dl.save({ filename: nombre, data: blob }); toast("Excel listo"); return; }
+  }catch(e){}
+
+  try{
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement("a");
+    a.href = url; a.download = nombre;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); }, 4000);
+    toast("Excel listo");
+  }catch(e){
+    exportarComoTexto();
+  }
+}
+function exportarComoTexto(){
+  var vs = delMes(S.viajes, mesVista);
+  var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
+  var adel = delMes(S.adelantos, mesVista).reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
   var lineas = [];
   lineas.push("CUIDAME EL CAMION - " + nombreMes(mesVista).toUpperCase());
   lineas.push("");
   lineas.push("VIAJES");
   lineas.push("Fecha;Origen;Destino;Grano;Kilos;Km;Tarifa;Flete;Porcentaje;Le corresponde;CTG");
-  var vs = delMes(S.viajes, mesVista);
   vs.forEach(function(v){
     lineas.push([fechaLarga(v.fecha), v.origen||"", v.destino||"", v.grano||"", v.kilos||0, v.kms||0,
       v.tarifa||0, Math.round(fleteDe(v)), (v.pct===undefined?S.cfg.pct:v.pct)+"%", Math.round(gananciaDe(v)), v.ctg||""]
       .map(function(c){ return String(c).replace(/;/g, ","); }).join(";"));
   });
   lineas.push("");
-  lineas.push("GASOIL");
-  lineas.push("Fecha;Kilometros tablero;Litros;Lugar;Consumo km/l");
-  consumos().filter(function(r){ return mesDe(r.c.fecha) === mesVista; }).forEach(function(r){
-    lineas.push([fechaLarga(r.c.fecha), r.c.km||0, r.c.litros||0, (r.c.lugar||"").replace(/;/g,","),
-      r.kml ? r.kml.toFixed(2).replace(".", ",") : ""].join(";"));
-  });
-  lineas.push("");
-  lineas.push("ADELANTOS");
-  lineas.push("Fecha;Monto;Nota");
-  delMes(S.adelantos, mesVista).forEach(function(a){
-    lineas.push([fechaLarga(a.fecha), a.monto||0, (a.nota||"").replace(/;/g,",")].join(";"));
-  });
-  var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
-  var adel = delMes(S.adelantos, mesVista).reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
-  lineas.push("");
   lineas.push("RESUMEN");
   lineas.push("Ganado en el mes;" + Math.round(ganado));
   lineas.push("Adelantos;" + Math.round(adel));
   lineas.push("Queda por cobrar;" + Math.round(ganado - adel));
-
-  var csv = "﻿" + lineas.join("\r\n");
-  var nombre = "cuaderno-" + mesVista + ".csv";
-  try{
-    var dl = await window.claude.use("downloads");
-    if(dl){ await dl.save({ filename: nombre, data: csv }); toast("Planilla lista"); return; }
-  }catch(e){}
+  var csv = lineas.join("\r\n");
   abrir('<h2>El resumen del mes</h2>'+
-    '<div class="desc">Copialo y pegalo donde lo necesites.</div>'+
-    '<div class="campo"><textarea rows="12" id="csvTxt" style="font-size:13px">'+esc(csv.replace("﻿",""))+'</textarea></div>'+
+    '<div class="desc">No se pudo armar el Excel. Copiá este texto y pegalo donde lo necesites.</div>'+
+    '<div class="campo"><textarea rows="12" id="csvTxt" style="font-size:13px">'+esc(csv)+'</textarea></div>'+
     '<div class="acciones">'+
       '<button class="btn pri chico" data-act="copiarCSV"><span class="ic">⧉</span><span>Copiar todo</span></button>'+
       '<button class="btn chico" data-act="cerrar"><span class="ic">✕</span><span>Cerrar</span></button>'+
