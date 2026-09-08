@@ -1563,6 +1563,7 @@ async function exportar(){
   var adelantosMes = delMes(S.adelantos, mesVista).slice().sort(function(a,b){ return (a.fecha||"").localeCompare(b.fecha||""); });
   var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
   var adel = adelantosMes.reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
+  var fleteT = vs.reduce(function(a,v){ return a + fleteDe(v); }, 0);
   var kilosT = vs.reduce(function(a,v){ return a + (Number(v.kilos)||0); }, 0);
   var kmsT = vs.reduce(function(a,v){ return a + (Number(v.kms)||0); }, 0);
   var litrosT = cargasMes.reduce(function(a,r){ return a + (Number(r.c.litros)||0); }, 0);
@@ -1575,11 +1576,11 @@ async function exportar(){
   filas.push([]);
 
   filas.push(["VIAJES"]);
-  filas.push(["Fecha","Origen","Destino","Grano","Kilos","Km","Tarifa","Flete del viaje","Su %","Le corresponde","CTG"]);
+  filas.push(["Fecha","Origen","Destino","Grano","Toneladas","Kilos","Km","Tarifa","Flete del viaje","Su %","Le corresponde","CTG"]);
   vs.forEach(function(v){
     filas.push([fechaLarga(v.fecha), v.origen||"", v.destino||"", v.grano||"",
-      Number(v.kilos)||0, Number(v.kms)||0, Number(v.tarifa)||0, Math.round(fleteDe(v)),
-      (v.pct===undefined?S.cfg.pct:v.pct)/100, Math.round(gananciaDe(v)), v.ctg||""]);
+      Number(((Number(v.kilos)||0)/1000).toFixed(2)), Number(v.kilos)||0, Number(v.kms)||0, Number(v.tarifa)||0,
+      Math.round(fleteDe(v)), (v.pct===undefined?S.cfg.pct:v.pct)/100, Math.round(gananciaDe(v)), v.ctg||""]);
   });
   if(!vs.length) filas.push(["Sin viajes este mes"]);
   filas.push([]);
@@ -1604,15 +1605,17 @@ async function exportar(){
   filas.push(["RESUMEN DEL MES"]);
   filas.push(["Viajes", vs.length]);
   filas.push(["Kilómetros recorridos", kmsT]);
-  filas.push(["Kilos transportados", kilosT]);
+  filas.push(["Toneladas transportadas", Number((kilosT/1000).toFixed(2))]);
   filas.push(["Litros de gasoil cargados", litrosT]);
   filas.push(["Consumo promedio (km/l)", prom ? Number(prom.toFixed(2)) : ""]);
-  filas.push(["Ganó en el mes (" + S.cfg.pct + "% del flete)", Math.round(ganado)]);
-  filas.push(["Adelantos", Math.round(adel)]);
-  filas.push(["Le queda por cobrar", Math.round(ganado - adel)]);
+  filas.push([]);
+  filas.push(["TOTAL FLETE", Math.round(fleteT)]);
+  filas.push([S.cfg.pct + "%", Math.round(ganado)]);
+  filas.push(["ADELANTOS", Math.round(adel)]);
+  filas.push(["A COBRAR", Math.round(ganado - adel)]);
 
   var wb = XLSX.utils.book_new();
-  var ws = hojaDe(filas, [24,20,20,10,10,8,11,15,7,15,14]);
+  var ws = hojaDe(filas, [24,20,20,10,11,10,8,11,15,7,15,14]);
   ws["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:1} }];
   var nombreHoja = nombreMes(mesVista).replace(/[\\\/?*\[\]:]/g, "").slice(0, 31);
   XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
