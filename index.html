@@ -1558,44 +1558,64 @@ function hojaDe(filas, anchos){
 async function exportar(){
   if(!window.XLSX){ exportarComoTexto(); return; }
 
-  var vs = delMes(S.viajes, mesVista);
+  var vs = delMes(S.viajes, mesVista).slice().sort(function(a,b){ return (a.fecha||"").localeCompare(b.fecha||""); });
   var cargasMes = consumos().filter(function(r){ return mesDe(r.c.fecha) === mesVista; });
-  var adelantosMes = delMes(S.adelantos, mesVista);
+  var adelantosMes = delMes(S.adelantos, mesVista).slice().sort(function(a,b){ return (a.fecha||"").localeCompare(b.fecha||""); });
   var ganado = vs.reduce(function(a,v){ return a + gananciaDe(v); }, 0);
   var adel = adelantosMes.reduce(function(a,x){ return a + (Number(x.monto)||0); }, 0);
+  var kilosT = vs.reduce(function(a,v){ return a + (Number(v.kilos)||0); }, 0);
+  var kmsT = vs.reduce(function(a,v){ return a + (Number(v.kms)||0); }, 0);
+  var litrosT = cargasMes.reduce(function(a,r){ return a + (Number(r.c.litros)||0); }, 0);
+  var prom = promedioGeneral();
 
-  var filasViajes = [["Fecha","Origen","Destino","Grano","Kilos","Km","Tarifa","Flete","Porcentaje","Le corresponde","CTG"]];
+  /* Todo en UNA sola hoja, en bloques, para verlo de un vistazo sin
+     tener que cambiar de pestaña en el Excel del celular. */
+  var filas = [];
+  filas.push(["CUÍDAME EL CAMIÓN", nombreMes(mesVista).toUpperCase()]);
+  filas.push([]);
+
+  filas.push(["VIAJES"]);
+  filas.push(["Fecha","Origen","Destino","Grano","Kilos","Km","Tarifa","Flete del viaje","Su %","Le corresponde","CTG"]);
   vs.forEach(function(v){
-    filasViajes.push([fechaLarga(v.fecha), v.origen||"", v.destino||"", v.grano||"",
+    filas.push([fechaLarga(v.fecha), v.origen||"", v.destino||"", v.grano||"",
       Number(v.kilos)||0, Number(v.kms)||0, Number(v.tarifa)||0, Math.round(fleteDe(v)),
       (v.pct===undefined?S.cfg.pct:v.pct)/100, Math.round(gananciaDe(v)), v.ctg||""]);
   });
+  if(!vs.length) filas.push(["Sin viajes este mes"]);
+  filas.push([]);
 
-  var filasGasoil = [["Fecha","Kilómetros tablero","Litros","Lugar","Consumo km/l"]];
+  filas.push(["GASOIL"]);
+  filas.push(["Fecha","Km del tablero","Litros","Dónde cargó","Consumo km/l"]);
   cargasMes.forEach(function(r){
-    filasGasoil.push([fechaLarga(r.c.fecha), Number(r.c.km)||0, Number(r.c.litros)||0,
+    filas.push([fechaLarga(r.c.fecha), Number(r.c.km)||0, Number(r.c.litros)||0,
       r.c.lugar||"", r.kml ? Number(r.kml.toFixed(2)) : ""]);
   });
+  if(!cargasMes.length) filas.push(["Sin cargas de gasoil este mes"]);
+  filas.push([]);
 
-  var filasAdelantos = [["Fecha","Monto","Nota"]];
+  filas.push(["ADELANTOS"]);
+  filas.push(["Fecha","Monto","Nota"]);
   adelantosMes.forEach(function(a){
-    filasAdelantos.push([fechaLarga(a.fecha), Number(a.monto)||0, a.nota||""]);
+    filas.push([fechaLarga(a.fecha), Number(a.monto)||0, a.nota||""]);
   });
+  if(!adelantosMes.length) filas.push(["Sin adelantos este mes"]);
+  filas.push([]);
 
-  var filasResumen = [
-    ["Cuídame el Camión", nombreMes(mesVista)],
-    [],
-    ["Viajes", vs.length],
-    ["Ganado en el mes", Math.round(ganado)],
-    ["Adelantos", Math.round(adel)],
-    ["Le queda por cobrar", Math.round(ganado - adel)]
-  ];
+  filas.push(["RESUMEN DEL MES"]);
+  filas.push(["Viajes", vs.length]);
+  filas.push(["Kilómetros recorridos", kmsT]);
+  filas.push(["Kilos transportados", kilosT]);
+  filas.push(["Litros de gasoil cargados", litrosT]);
+  filas.push(["Consumo promedio (km/l)", prom ? Number(prom.toFixed(2)) : ""]);
+  filas.push(["Ganó en el mes (" + S.cfg.pct + "% del flete)", Math.round(ganado)]);
+  filas.push(["Adelantos", Math.round(adel)]);
+  filas.push(["Le queda por cobrar", Math.round(ganado - adel)]);
 
   var wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, hojaDe(filasResumen, [22,16]), "Resumen");
-  XLSX.utils.book_append_sheet(wb, hojaDe(filasViajes, [11,20,20,10,9,7,10,12,10,14,14]), "Viajes");
-  XLSX.utils.book_append_sheet(wb, hojaDe(filasGasoil, [11,17,8,20,13]), "Gasoil");
-  XLSX.utils.book_append_sheet(wb, hojaDe(filasAdelantos, [11,12,26]), "Adelantos");
+  var ws = hojaDe(filas, [24,20,20,10,10,8,11,15,7,15,14]);
+  ws["!merges"] = [{ s:{r:0,c:0}, e:{r:0,c:1} }];
+  var nombreHoja = nombreMes(mesVista).replace(/[\\\/?*\[\]:]/g, "").slice(0, 31);
+  XLSX.utils.book_append_sheet(wb, ws, nombreHoja);
 
   var buf = XLSX.write(wb, { bookType: "xlsx", type: "array" });
   var blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
