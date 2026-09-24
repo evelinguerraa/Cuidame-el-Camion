@@ -277,6 +277,23 @@ button{font-family:inherit}
   background:var(--deep);color:var(--deep-ink);padding:11px 18px;border-radius:11px;
   font-size:14.5px;font-weight:600;box-shadow:var(--shadow);max-width:90vw;text-align:center}
 #toast[hidden]{display:none}
+#bannerInstalar{
+  display:flex;align-items:center;gap:12px;margin:14px 0 0;padding:14px 16px;
+  border-radius:14px;background:var(--accent-soft);border:1px solid var(--accent);
+}
+#bannerInstalar[hidden]{display:none}
+#bannerInstalar .ic{font-size:26px;flex:none}
+#bannerInstalar .txt{flex:1;font-size:14.5px;font-weight:600;color:var(--accent-ink)}
+#bannerInstalar .txt small{display:block;font-weight:400;font-size:12.5px;margin-top:2px;opacity:.85}
+#bannerInstalar button{font-family:inherit;cursor:pointer}
+#btnInstalar{
+  padding:10px 16px;border-radius:11px;border:1px solid var(--accent-ink);
+  background:var(--accent-ink);color:var(--accent);font-size:14.5px;font-weight:700;flex:none;
+}
+#btnNoInstalar{
+  background:none;border:none;color:var(--accent-ink);font-size:20px;line-height:1;
+  opacity:.6;flex:none;padding:4px;
+}
 .ajuste-nota{font-size:13.5px;color:var(--muted);margin:-6px 0 16px;line-height:1.5}
 </style>
 
@@ -287,6 +304,12 @@ button{font-family:inherit}
       <h1>Cuídame el Camión</h1>
       <div class="sub" id="subtitulo">Viajes, gasoil y adelantos</div>
     </div>
+  </div>
+  <div id="bannerInstalar" hidden>
+    <div class="ic">📲</div>
+    <div class="txt">Instalar en el celular<small>Para abrirla como una app, sin el navegador</small></div>
+    <button id="btnInstalar">Instalar</button>
+    <button id="btnNoInstalar" aria-label="Ahora no">✕</button>
   </div>
   <div id="vista"></div>
 </div>
@@ -1788,6 +1811,50 @@ document.addEventListener("keydown", function(ev){
 if(!cargar()){ sembrarEjemplos(); guardar(); }
 pintar();
 prepararIA();
+
+/* --- instalar la app con un solo toque, sin pasar por el menú --- */
+(function(){
+  var LS_OCULTO = "cuadernoRuta.instalarOculto";
+  var banner = document.getElementById("bannerInstalar");
+  var deferido = null;
+
+  function yaInstalada(){
+    return window.matchMedia("(display-mode: standalone)").matches || window.navigator.standalone === true;
+  }
+  function ocultoTodavia(){
+    try{ return Date.now() < Number(localStorage.getItem(LS_OCULTO) || 0); }
+    catch(e){ return false; }
+  }
+
+  window.addEventListener("beforeinstallprompt", function(e){
+    e.preventDefault();
+    deferido = e;
+    if(yaInstalada() || ocultoTodavia()) return;
+    banner.hidden = false;
+  });
+
+  document.getElementById("btnInstalar").addEventListener("click", async function(){
+    banner.hidden = true;
+    if(!deferido) return;
+    deferido.prompt();
+    try{
+      var res = await deferido.userChoice;
+      if(res && res.outcome === "accepted") toast("Instalando la app...");
+    }catch(e){}
+    deferido = null;
+  });
+
+  document.getElementById("btnNoInstalar").addEventListener("click", function(){
+    banner.hidden = true;
+    try{ localStorage.setItem(LS_OCULTO, String(Date.now() + 7*24*60*60*1000)); }catch(e){}
+  });
+
+  window.addEventListener("appinstalled", function(){
+    banner.hidden = true;
+    deferido = null;
+    toast("¡Lista! Ya la tenés instalada");
+  });
+})();
 
 /* --- recibir la carta de porte compartida desde WhatsApp --- */
 var CACHE_COMPARTIDO = "compartido-v1", CLAVE_COMPARTIDO = "archivo-compartido";
